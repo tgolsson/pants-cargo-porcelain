@@ -1,0 +1,4 @@
+/.pants.d/
+/.pids/
+__pycache__
+*.pyc

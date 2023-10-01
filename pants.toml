@@ -1,0 +1,84 @@
+[GLOBAL]
+pants_version = "2.18.0a0"
+
+
+pythonpath = [
+   "%(buildroot)s/pants-backends/cargo-porcelain",
+]
+
+backend_packages = [
+  "pants.backend.python",
+  "pants.backend.experimental.python",
+
+  "pants.backend.python.lint.black",
+  "pants.backend.python.lint.isort",
+  "pants.backend.python.lint.flake8",
+
+  "pants.backend.shell",
+  "pants.backend.experimental.python.lint.ruff",
+
+  "pants_cargo_porcelain",
+  "pants.backend.plugin_development",
+]
+
+pants_ignore = [
+    ".*/",
+    "/dist/",
+    "__pycache__",
+    "**/pdm_build.py",
+]
+
+
+[python]
+tailor_pex_binary_targets = true
+interpreter_constraints = [">=3.7,<3.10"]
+enable_resolves = true
+default_resolve = "pants-plugins"
+
+[python.resolves]
+pants-plugins = "pants-plugins/pants.lock"
+pants-215 = "pants-plugins/215.lock"
+pants-216 = "pants-plugins/216.lock"
+pants-217 = "pants-plugins/217.lock"
+
+pytest = "locks/tools/pytest.lock"
+isort = "locks/tools/isort.lock"
+ipython = "locks/tools/ipython.lock"
+black = "locks/tools/black.lock"
+
+[python.resolves_to_interpreter_constraints]
+pants-plugins = [">=3.7,<3.10"]
+pants-215 = [">=3.7,<3.10"]
+pants-216 = [">=3.7,<3.10"]
+pants-217 = [">=3.7,<3.10"]
+
+black = [">=3.9,<3.10"]
+
+[black]
+install_from_resolve = "black"
+interpreter_constraints = ["==3.9.*"]
+
+[ipython]
+install_from_resolve = "ipython"
+
+[isort]
+install_from_resolve = "isort"
+args = '--resolve-all-configs'
+interpreter_constraints = ["==3.9.*"]
+config = "['pyproject.toml']"
+
+[pytest]
+args = ["--no-header"]
+execution_slot_var = "TEST_EXECUTION_SLOT"
+install_from_resolve = "pytest"
+
+
+[source]
+root_patterns = []
+marker_filenames = ["pyproject.toml"]
+
+[anonymous-telemetry]
+enabled = false
+
+[rust]
+rust_version = "1.72.1"

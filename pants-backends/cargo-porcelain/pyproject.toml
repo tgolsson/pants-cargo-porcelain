@@ -1,0 +1,41 @@
+[project]
+name = "pants_cargo_porcelain"
+description = ""
+version = "0.4.0"
+authors = [
+    { name = "Tom Solberg", email = "me@sbg.dev" }
+]
+
+readme = "README.md"
+license = {file = "LICENSE-MIT.txt"}
+keywords = ["pantsbuild", "pants"]
+
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Topic :: Software Development :: Build Tools",
+]
+
+[project.urls]
+Repository = "https://github.com/tgolsson/pants-cargo-porcelain"
+Code = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/pants-plugins/cargo-porcelain"
+Changelog = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/CHANGELOG.md"
+
+[tool.pdm.build]
+excludes = ["**/BUILD"]
+
+[build-system]
+requires = ["pdm-backend>=1.0.0"]
+build-backend = "pdm.backend"
+
+
+[tool.black]
+line-length = 100
+preview = true
+
+[tool.isort]
+profile = "black"
+line_length = 100
+color_output = true
+known_first_party = ["pants_cargo_porcelain"]
+include_trailing_comma = true
