@@ -1,14 +1,14 @@
 from dataclasses import dataclass
-from pants.engine.rules import collect_rules, rule, Get
-from pants_cargo_porcelain.subsystems import RustupTool
-from pants.engine.process import Process, ProcessResult
-from pants.util.logging import LogLevel
-from pants.util.frozendict import FrozenDict
-from pants.core.util_rules.external_tool import (
-    DownloadedExternalTool,
-    ExternalToolRequest,
-)
+
+from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
+from pants.engine.fs import EMPTY_DIGEST
 from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessResult
+from pants.engine.rules import Get, collect_rules, rule
+from pants.util.frozendict import FrozenDict
+from pants.util.logging import LogLevel
+
+from pants_cargo_porcelain.subsystems import RustupTool
 
 RUSTUP_NAMED_CACHE = ".rustup"
 RUSTUP_APPEND_ONLY_CACHES = FrozenDict({"rustup": RUSTUP_NAMED_CACHE})
@@ -37,6 +37,10 @@ class RustToolchain:
 
     ok: bool
 
+    @property
+    def cargo(self) -> str:
+        return f"{self.path}-{self.target}/bin/cargo"
+
 
 @dataclass(frozen=True)
 class RustupBinary:
@@ -49,16 +53,17 @@ class RustupBinaryRequest:
 
 
 @rule(desc="Get Rust toolchain", level=LogLevel.DEBUG)
-def get_rustup_binary(
+async def get_rustup_binary(
     req: RustupBinaryRequest, rustup: RustupTool, platform: Platform
 ) -> RustupBinary:
     rustup_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, rustup.get_request(platform)
     )
-    res = await Get(
+    print(rustup_tool)
+    _ = await Get(
         ProcessResult,
         Process(
-            argv=[rustup_tool.path, "--no-update-default-toolchain", "--no-modify-path"],
+            argv=[rustup_tool.exe, "--no-update-default-toolchain", "--no-modify-path", "-y"],
             input_digest=rustup_tool.digest,
             description="Installing Rustup",
             level=LogLevel.DEBUG,
@@ -71,14 +76,14 @@ def get_rustup_binary(
 
 
 @rule(desc="Get Rust toolchain", level=LogLevel.DEBUG)
-def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
-    rustup_binary = Get(RustupBinary, RustupBinaryRequest())
+async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
+    rustup_binary = await Get(RustupBinary, RustupBinaryRequest())
 
     _ = await Get(
         ProcessResult,
         Process(
             argv=[rustup_binary.path, "toolchain", "install", request.version],
-            input_digest=(),
+            input_digest=EMPTY_DIGEST,
             description="Installing Rustup",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
@@ -96,7 +101,7 @@ def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 f"--toolchain={request.version}",
                 request.target,
             ],
-            input_digest=(),
+            input_digest=EMPTY_DIGEST,
             description="Installing Rustup",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
@@ -114,7 +119,7 @@ def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 f"--toolchain={request.version}",
                 request.target,
             ],
-            input_digest=(),
+            input_digest=EMPTY_DIGEST,
             description="Installing Rustup",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
@@ -132,12 +137,19 @@ def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 f"--toolchain={request.version}",
                 *request.components,
             ],
-            input_digest=(),
+            input_digest=EMPTY_DIGEST,
             description="Installing Rustup",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
             env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
         ),
+    )
+
+    return RustToolchain(
+        path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}",
+        version=request.version,
+        target=request.target,
+        ok=True,
     )
 
 

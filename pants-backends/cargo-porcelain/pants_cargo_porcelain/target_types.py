@@ -1,5 +1,6 @@
 from typing import Iterable, Optional, Sequence, Tuple
 
+from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.addresses import Address
 from pants.engine.target import (
@@ -10,7 +11,6 @@ from pants.engine.target import (
     InvalidFieldException,
     InvalidTargetException,
     MultipleSourcesField,
-    OutputPathField,
     StringField,
     StringSequenceField,
     Target,
@@ -103,3 +103,7 @@ class CargoBinaryTarget(Target):
 
         """
     )
+
+
+def target_types():
+    return [CargoPackageTarget, CargoBinaryTarget]

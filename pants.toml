@@ -1,7 +1,6 @@
 [GLOBAL]
 pants_version = "2.18.0a0"
 
-
 pythonpath = [
    "%(buildroot)s/pants-backends/cargo-porcelain",
 ]
@@ -80,5 +79,5 @@ marker_filenames = ["pyproject.toml"]
 [anonymous-telemetry]
 enabled = false
 
-[rust]
-rust_version = "1.72.1"
+# [rust]
+# rust_version = "1.72.1"
