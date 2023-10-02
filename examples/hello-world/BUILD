@@ -1,3 +1,1 @@
-# cargo_package()
-
-cargo_package()
+cargo_package(name="hello-world")

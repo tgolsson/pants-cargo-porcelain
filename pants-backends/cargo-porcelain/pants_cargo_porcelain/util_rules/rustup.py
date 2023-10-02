@@ -39,7 +39,7 @@ class RustToolchain:
 
     @property
     def cargo(self) -> str:
-        return f"{self.path}-{self.target}/bin/cargo"
+        return f"{self.path}/bin/cargo"
 
 
 @dataclass(frozen=True)
@@ -52,14 +52,13 @@ class RustupBinaryRequest:
     pass
 
 
-@rule(desc="Get Rust toolchain", level=LogLevel.DEBUG)
+@rule(desc="Get RustUp", level=LogLevel.DEBUG)
 async def get_rustup_binary(
     req: RustupBinaryRequest, rustup: RustupTool, platform: Platform
 ) -> RustupBinary:
     rustup_tool = await Get(
         DownloadedExternalTool, ExternalToolRequest, rustup.get_request(platform)
     )
-    print(rustup_tool)
     _ = await Get(
         ProcessResult,
         Process(
@@ -146,7 +145,7 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
     )
 
     return RustToolchain(
-        path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}",
+        path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}-{request.target}",
         version=request.version,
         target=request.target,
         ok=True,

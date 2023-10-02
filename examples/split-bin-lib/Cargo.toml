@@ -1,5 +1,5 @@
 [package]
-name = "hello-world"
+name = "split-bin-lib"
 version = "0.1.0"
 edition = "2021"
 

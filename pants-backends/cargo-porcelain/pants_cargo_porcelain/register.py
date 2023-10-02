@@ -1,7 +1,8 @@
 from . import subsystems
 from . import target_types as tt
-from .goals import tailor
-from .util_rules import rustup
+from .goals import package, tailor
+from .internal import build
+from .util_rules import cargo, rustup
 
 
 def rules():
@@ -10,6 +11,10 @@ def rules():
         *tailor.rules(),
         #        *package.rules(),
         *rustup.rules(),
+        *tt.rules(),
+        *cargo.rules(),
+        *build.rules(),
+        *package.rules(),
     ]
 
 
