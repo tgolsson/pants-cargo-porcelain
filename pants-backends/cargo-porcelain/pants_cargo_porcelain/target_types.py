@@ -46,6 +46,11 @@ from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 
 
+class CargoPackageNameField(StringField):
+    alias = "package_name"
+    help = "The name of the package."
+
+
 class CargoPackageSourcesField(MultipleSourcesField):
     default = ("Cargo.toml", "build.rs", "src/**/*")
     expected_file_extensions = (".rs", ".toml")
@@ -94,10 +99,8 @@ class CargoPackageTarget(TargetGenerator):
         EnvironmentField,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text(
-        """
-        """
-    )
+    help = help_text("""
+        """)
 
 
 class CargoSourcesField(MultipleSourcesField):
@@ -124,6 +127,27 @@ class CargoBinaryNameField(StringField):
     help = "The name of the binary."
 
 
+class CargoLibraryNameField(StringField):
+    alias = "binary_name"
+    help = "The name of the binary."
+
+
+class CargoPackageTargetImpl(Target):
+    alias = "cargo_package_impl"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CargoPackageDependenciesField,
+        CargoPackageSourcesField,
+        SkipCargoTestsField,
+        OutputPathField,
+        EnvironmentField,
+        CargoPackageNameField,
+    )
+    help = help_text("""
+
+        """)
+
+
 class CargoBinaryTarget(Target):
     alias = "cargo_binary"
     core_fields = (
@@ -135,11 +159,9 @@ class CargoBinaryTarget(Target):
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text(
-        """
+    help = help_text("""
 
-        """
-    )
+        """)
 
 
 class CargoLibraryTarget(Target):
@@ -151,12 +173,11 @@ class CargoLibraryTarget(Target):
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
+        CargoLibraryNameField,
     )
-    help = help_text(
-        """
+    help = help_text("""
 
-        """
-    )
+        """)
 
 
 class GenerateCargoTargetsRequest(GenerateTargetsRequest):
@@ -211,7 +232,16 @@ async def generate_cargo_generated_target(
         if "lib" in target["kind"]:
             libraries.append(target)
 
-    generated_targets = []
+    name = request.generator.address.create_generated("package")
+    generated_targets = [
+        CargoPackageTargetImpl(
+            {
+                CargoPackageNameField.alias: output["packages"][0]["name"],
+                **request.template,
+            },
+            name,
+        )
+    ]
     generated_lib_names = []
     for target in libraries:
         name = request.generator.address.create_generated(target["name"])
@@ -221,7 +251,7 @@ async def generate_cargo_generated_target(
                 name,
             )
         )
-        generated_lib_names.append(name)
+        generated_lib_names.append(str(name))
 
     for target in binaries:
         name = request.generator.address.create_generated(target["name"])

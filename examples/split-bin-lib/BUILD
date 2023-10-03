@@ -1,1 +1,3 @@
-cargo_package()
+cargo_package(
+    name="split-bin-lib",
+)

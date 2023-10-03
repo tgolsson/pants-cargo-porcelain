@@ -1,6 +1,6 @@
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, StrOption
+from pants.option.option_types import BoolOption, SkipOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
@@ -8,13 +8,17 @@ from pants.util.strutil import softwrap
 class RustSubsystem(Subsystem):
     """General settings for Rust."""
 
+    name = "rust"
     options_scope = "rust"
     help = "General settings for Rust."
+
     tailor = BoolOption(
         default=True,
         help=softwrap(""" If true, add `cargo_package` targets with the `tailor` goal."""),
         advanced=True,
     )
+
+    skip = SkipOption("fmt", "lint")
 
 
 class RustupTool(ExternalTool):

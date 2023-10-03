@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 
 from pants.core.goals.tailor import (
@@ -54,7 +55,11 @@ async def find_putative_targets(
     for dirname, filenames in group_by_dir(unowned_cargo_files).items():
         pts.append(
             PutativeTarget.for_target_type(
-                CargoPackageTarget, path=dirname, name=None, triggering_sources=sorted(filenames)
+                CargoPackageTarget,
+                path=dirname,
+                name=None,
+                triggering_sources=sorted(filenames),
+                package_name=os.path.basename(dirname),
             )
         )
 
