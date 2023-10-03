@@ -9,9 +9,8 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import Digest, PathGlobs, Paths
+from pants.engine.fs import PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
@@ -19,7 +18,6 @@ from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageTarget
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 
 
@@ -59,7 +57,6 @@ async def find_putative_targets(
                 path=dirname,
                 name=None,
                 triggering_sources=sorted(filenames),
-                package_name=os.path.basename(dirname),
             )
         )
 

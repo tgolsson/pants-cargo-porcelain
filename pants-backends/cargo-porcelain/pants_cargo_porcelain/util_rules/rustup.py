@@ -83,7 +83,7 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
         Process(
             argv=[rustup_binary.path, "toolchain", "install", request.version],
             input_digest=EMPTY_DIGEST,
-            description="Installing Rustup",
+            description=f"Installing Rust {request.version}",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
             env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
@@ -101,48 +101,33 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 request.target,
             ],
             input_digest=EMPTY_DIGEST,
-            description="Installing Rustup",
+            description=f"Installing target {request.target} for toolchain {request.version}",
             level=LogLevel.DEBUG,
             append_only_caches=BOTH_CACHES,
             env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
         ),
     )
 
-    _ = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                rustup_binary.path,
-                "target",
-                "add",
-                f"--toolchain={request.version}",
-                request.target,
-            ],
-            input_digest=EMPTY_DIGEST,
-            description="Installing Rustup",
-            level=LogLevel.DEBUG,
-            append_only_caches=BOTH_CACHES,
-            env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-        ),
-    )
-
-    _ = await Get(
-        ProcessResult,
-        Process(
-            argv=[
-                rustup_binary.path,
-                "component",
-                "add",
-                f"--toolchain={request.version}",
-                *request.components,
-            ],
-            input_digest=EMPTY_DIGEST,
-            description="Installing Rustup",
-            level=LogLevel.DEBUG,
-            append_only_caches=BOTH_CACHES,
-            env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-        ),
-    )
+    if request.components:
+        _ = await Get(
+            ProcessResult,
+            Process(
+                argv=[
+                    rustup_binary.path,
+                    "component",
+                    "add",
+                    f"--toolchain={request.version}",
+                    *request.components,
+                ],
+                input_digest=EMPTY_DIGEST,
+                description=(
+                    f"Installing components {request.components} for toolchain {request.version}"
+                ),
+                level=LogLevel.DEBUG,
+                append_only_caches=BOTH_CACHES,
+                env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
+            ),
+        )
 
     return RustToolchain(
         path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}-{request.target}",

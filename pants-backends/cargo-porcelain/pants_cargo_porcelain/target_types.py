@@ -1,44 +1,29 @@
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
-from typing import Iterable, Optional, Sequence, Tuple
+from typing import Iterable, Optional, Tuple
 
 from pants.core.goals.package import OutputPathField
-from pants.core.goals.tailor import (
-    AllOwnedSources,
-    PutativeTarget,
-    PutativeTargets,
-    PutativeTargetsRequest,
-)
 from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest, PathGlobs, Paths
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
-from pants.engine.rules import Rule, collect_rules, rule
+from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
-    AsyncFieldMixin,
     BoolField,
     Dependencies,
     GeneratedTargets,
     GenerateTargetsRequest,
     InvalidFieldException,
-    InvalidTargetException,
     MultipleSourcesField,
     StringField,
-    StringSequenceField,
     Target,
     TargetGenerator,
-    TriBoolField,
-    ValidNumbers,
     generate_multiple_sources_field_help_message,
 )
 from pants.engine.unions import UnionRule
-from pants.util.dirutil import group_by_dir
-from pants.util.logging import LogLevel
 from pants.util.strutil import help_text
 
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
@@ -52,8 +37,8 @@ class CargoPackageNameField(StringField):
 
 
 class CargoPackageSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "build.rs", "src/**/*")
-    expected_file_extensions = (".rs", ".toml")
+    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*")
+    expected_file_extensions = (".rs", ".toml", ".lock")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['Cargo.toml', 'src/lib.rs', 'build.rs', '!test_ignore.rs']`"
     )
@@ -99,8 +84,10 @@ class CargoPackageTarget(TargetGenerator):
         EnvironmentField,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text("""
-        """)
+    help = help_text(
+        """
+        """
+    )
 
 
 class CargoSourcesField(MultipleSourcesField):
@@ -143,9 +130,11 @@ class CargoPackageTargetImpl(Target):
         EnvironmentField,
         CargoPackageNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoBinaryTarget(Target):
@@ -159,9 +148,11 @@ class CargoBinaryTarget(Target):
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoLibraryTarget(Target):
@@ -175,9 +166,11 @@ class CargoLibraryTarget(Target):
         EnvironmentField,
         CargoLibraryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class GenerateCargoTargetsRequest(GenerateTargetsRequest):
