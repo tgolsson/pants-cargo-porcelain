@@ -1,6 +1,6 @@
 from . import subsystems
 from . import target_types as tt
-from .goals import fmt, package, tailor
+from .goals import fmt, package, tailor, test
 from .internal import build
 from .util_rules import cargo, rustup
 
@@ -16,6 +16,7 @@ def rules():
         *build.rules(),
         *package.rules(),
         *fmt.rules(),
+        *test.rules(),
     ]
 
 

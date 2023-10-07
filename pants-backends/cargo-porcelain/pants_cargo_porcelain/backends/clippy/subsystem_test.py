@@ -1,12 +1,8 @@
 import pytest
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, Partitions
-from pants.core.util_rules import config_files, external_tool, source_files
-from pants.engine import process
-from pants.engine.internals import graph, platform_rules
-from pants.engine.internals.graph import _TargetParametrizations, _TargetParametrizationsRequest
+from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
-from pants.source.source_root import rules as source_root_rules
 from pants.testutil.rule_runner import RuleRunner
 
 from pants_cargo_porcelain import register
@@ -22,16 +18,10 @@ from pants_cargo_porcelain.backends.clippy.goals.lint import (
 def rule_runner():
     rule_runner = RuleRunner(
         rules=[
-            *graph.rules(),
             *register.rules(),
             *clippy_register.rules(),
             *source_files.rules(),
-            *process.rules(),
-            *platform_rules.rules(),
-            *config_files.rules(),
-            *source_root_rules(),
             *external_tool.rules(),
-            QueryRule(_TargetParametrizations, [_TargetParametrizationsRequest]),
             QueryRule(Partitions, [CargoClippyRequest.PartitionRequest]),
             QueryRule(LintResult, [CargoClippyRequest.Batch]),
         ],

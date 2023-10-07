@@ -37,7 +37,7 @@ class CargoPackageNameField(StringField):
 
 
 class CargoPackageSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*")
+    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*", "examples/**/*")
     expected_file_extensions = (".rs", ".toml", ".lock")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['Cargo.toml', 'src/lib.rs', 'build.rs', '!test_ignore.rs']`"
