@@ -84,8 +84,10 @@ class CargoPackageTarget(TargetGenerator):
         EnvironmentField,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text("""
-        """)
+    help = help_text(
+        """
+        """
+    )
 
 
 class CargoSourcesField(MultipleSourcesField):
@@ -128,9 +130,11 @@ class CargoPackageTargetImpl(Target):
         EnvironmentField,
         CargoPackageNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoBinaryTarget(Target):
@@ -144,9 +148,11 @@ class CargoBinaryTarget(Target):
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoLibraryTarget(Target):
@@ -160,9 +166,11 @@ class CargoLibraryTarget(Target):
         EnvironmentField,
         CargoLibraryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class GenerateCargoTargetsRequest(GenerateTargetsRequest):
@@ -265,4 +273,9 @@ def rules():
 
 
 def target_types():
-    return [CargoPackageTarget, CargoBinaryTarget]
+    return [
+        CargoPackageTarget,
+        CargoPackageTargetImpl,
+        CargoBinaryTarget,
+        CargoLibraryTarget,
+    ]

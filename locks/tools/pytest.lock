@@ -10,6 +10,8 @@
 //   ],
 //   "generated_with_requirements": [
 //     "pytest-cov!=2.12.1,<3.1,>=2.12",
+//     "pytest-platform-markers",
+//     "pytest-rerunfailures",
 //     "pytest-xdist<3,>=2.5",
 //     "pytest==7.0.*"
 //   ],
@@ -432,6 +434,48 @@
           "artifacts": [
             {
               "algorithm": "sha256",
+              "hash": "b05cb0bcd51a7cd0375bfbeeb3eaeb01fc85665e45b21fc9494a8a19137f4d32",
+              "url": "https://files.pythonhosted.org/packages/c5/d1/2ef73ee137add043df444fddf1c851b8ca70ab9c7b7f18e18c4c244fec6d/pytest_platform_markers-1.0.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "07ea92669114ba8083b6653995b5a9ab14d57ca16307fd2af22d6f7d295160e4",
+              "url": "https://files.pythonhosted.org/packages/b3/e7/174a22a8cb4cf4b64456cd799f472bb90206f1ce8d537edbc1d9659689a3/pytest-platform-markers-1.0.0.tar.gz"
+            }
+          ],
+          "project_name": "pytest-platform-markers",
+          "requires_dists": [
+            "pytest>=3.6.0"
+          ],
+          "requires_python": null,
+          "version": "1.0.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
+              "hash": "9a1afd04e21b8177faf08a9bbbf44de7a0fe3fc29f8ddbe83b9684bd5f8f92a9",
+              "url": "https://files.pythonhosted.org/packages/25/14/e02206388902a828cc26894996dfc68eec50f7583bcddc4b5605d0c18b51/pytest_rerunfailures-12.0-py3-none-any.whl"
+            },
+            {
+              "algorithm": "sha256",
+              "hash": "784f462fa87fe9bdf781d0027d856b47a4bfe6c12af108f6bd887057a917b48e",
+              "url": "https://files.pythonhosted.org/packages/97/66/40f778791860c5234c5c677026d45c1a8708873b3dba8111de672bceac4f/pytest-rerunfailures-12.0.tar.gz"
+            }
+          ],
+          "project_name": "pytest-rerunfailures",
+          "requires_dists": [
+            "importlib-metadata>=1; python_version < \"3.8\"",
+            "packaging>=17.1",
+            "pytest>=6.2"
+          ],
+          "requires_python": ">=3.7",
+          "version": "12.0"
+        },
+        {
+          "artifacts": [
+            {
+              "algorithm": "sha256",
               "hash": "6fe5c74fec98906deb8f2d2b616b5c782022744978e7bd4695d39c8f42d0ce65",
               "url": "https://files.pythonhosted.org/packages/21/08/b1945d4b4986eb1aa10cf84efc5293bba39da80a2f95db3573dd90678408/pytest_xdist-2.5.0-py3-none-any.whl"
             },
@@ -536,6 +580,8 @@
   "prefer_older_binary": false,
   "requirements": [
     "pytest-cov!=2.12.1,<3.1,>=2.12",
+    "pytest-platform-markers",
+    "pytest-rerunfailures",
     "pytest-xdist<3,>=2.5",
     "pytest==7.0.*"
   ],

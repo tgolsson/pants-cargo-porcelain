@@ -52,7 +52,7 @@ async def partition(
     for field_set in request.field_sets:
         partitions.append(
             Partition(
-                [field_set],
+                (field_set,),
                 PackageMetadata(
                     address=field_set.address,
                 ),

@@ -157,13 +157,13 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "d7c24979f292f916dc9cbf8648319032f551ea8c49a4c9bf2fb556a02070ec1d",
-              "url": "https://files.pythonhosted.org/packages/14/51/fe5a0d6ea589f0d4a1b97824fb518962ad48b27cd346dcdfa2405187997a/platformdirs-3.10.0-py3-none-any.whl"
+              "hash": "e9d171d00af68be50e9202731309c4e658fd8bc76f55c11c7dd760d023bda68e",
+              "url": "https://files.pythonhosted.org/packages/56/29/3ec311dc18804409ecf0d2b09caa976f3ae6215559306b5b530004e11156/platformdirs-3.11.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "b45696dab2d7cc691a3226759c0d3b00c47c8b6e293d96f6436f733303f77f6d",
-              "url": "https://files.pythonhosted.org/packages/dc/99/c922839819f5d00d78b3a1057b5ceee3123c69b2216e776ddcb5a4c265ff/platformdirs-3.10.0.tar.gz"
+              "hash": "cf8ee52a3afdb965072dcc652433e0c7e3e40cf5ea1477cd4b3b1d2eb75495b3",
+              "url": "https://files.pythonhosted.org/packages/d3/e3/aa14d6b2c379fbb005993514988d956f1b9fdccd9cbe78ec0dbe5fb79bf5/platformdirs-3.11.0.tar.gz"
             }
           ],
           "project_name": "platformdirs",
@@ -180,7 +180,7 @@
             "typing-extensions>=4.7.1; python_version < \"3.8\""
           ],
           "requires_python": ">=3.7",
-          "version": "3.10.0"
+          "version": "3.11.0"
         },
         {
           "artifacts": [

@@ -144,18 +144,18 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "cb8ce23fbccff0025e9386b5cf85e892f94c9b822378f8da49970471335ac64e",
-              "url": "https://files.pythonhosted.org/packages/8e/46/7e3ae3aa2dcfcffc5138c6cef5448523218658411c84a2000bf75c8d3ec1/jedi-0.19.0-py2.py3-none-any.whl"
+              "hash": "e983c654fe5c02867aef4cdfce5a2fbb4a50adc0af145f70504238f18ef5e7e0",
+              "url": "https://files.pythonhosted.org/packages/20/9f/bc63f0f0737ad7a60800bfd472a4836661adae21f9c2535f3957b1e54ceb/jedi-0.19.1-py2.py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "bcf9894f1753969cbac8022a8c2eaee06bfa3724e4192470aaffe7eb6272b0c4",
-              "url": "https://files.pythonhosted.org/packages/57/38/4ac6f712c308de92af967142bd67e9d27e784ea5a3524c9e84f33507d82f/jedi-0.19.0.tar.gz"
+              "hash": "cf0496f3651bc65d7174ac1b7d043eff454892c708a87d1b683e57b569927ffd",
+              "url": "https://files.pythonhosted.org/packages/d6/99/99b493cec4bf43176b678de30f81ed003fd6a647a301b9c927280c600f0a/jedi-0.19.1.tar.gz"
             }
           ],
           "project_name": "jedi",
           "requires_dists": [
-            "Django<3.1; extra == \"testing\"",
+            "Django; extra == \"testing\"",
             "Jinja2==2.11.3; extra == \"docs\"",
             "MarkupSafe==1.1.1; extra == \"docs\"",
             "Pygments==2.8.1; extra == \"docs\"",
@@ -191,7 +191,7 @@
             "urllib3==1.26.4; extra == \"docs\""
           ],
           "requires_python": ">=3.6",
-          "version": "0.19.0"
+          "version": "0.19.1"
         },
         {
           "artifacts": [
