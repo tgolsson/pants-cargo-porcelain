@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
 
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
@@ -34,7 +34,10 @@ class CargoFmtRequest(FmtTargetsRequest):
     tool_subsystem = RustSubsystem
 
 
-class _EmptyMetadata:
+@dataclass(frozen=True)
+class PackageMetadata:
+    address: Address
+
     @property
     def description(self) -> None:
         return None
@@ -43,7 +46,7 @@ class _EmptyMetadata:
 @rule
 async def partition(
     request: CargoFmtRequest.PartitionRequest[CargoFmtFieldSet], subsystem: RustSubsystem
-) -> Partitions[CargoFmtFieldSet, Any]:
+) -> Partitions[CargoFmtFieldSet, PackageMetadata]:
     if subsystem.skip:
         return Partitions()
 
@@ -54,20 +57,26 @@ async def partition(
             SourceFilesRequest([field_set.sources]),
         )
 
-        partitions.append(Partition(source_files.files, _EmptyMetadata()))
+        partitions.append(
+            Partition(
+                source_files.files,
+                PackageMetadata(
+                    address=field_set.address,
+                ),
+            )
+        )
 
     return Partitions(partitions)
 
 
 @rule(desc="Format Cargo package", level=LogLevel.DEBUG)
-async def cargo_fmt(request: CargoFmtRequest.Batch[CargoFmtFieldSet, Any]) -> FmtResult:
+async def cargo_fmt(request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMetadata]) -> FmtResult:
     toolchain = await Get(
         RustToolchain,
-        RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("rustfmt", "cargo", "clippy")),
+        RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("rustfmt", "cargo")),
     )
 
-    # Why does a .Batch not include the target..?
-    cargo_toml_path = request.elements[0]
+    cargo_toml_path = f"{request.partition_metadata.address.spec_path}/Cargo.toml"
     process_result = await Get(
         ProcessResult,
         CargoProcessRequest(

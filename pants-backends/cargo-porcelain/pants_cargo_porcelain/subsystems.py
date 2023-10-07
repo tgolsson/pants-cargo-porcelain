@@ -64,5 +64,6 @@ class RustupTool(ExternalTool):
 
 def rules():
     return [
+        *RustSubsystem.rules(),
         *RustupTool.rules(),
     ]

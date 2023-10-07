@@ -12,10 +12,9 @@ from pants.core.goals.package import (
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.util_rules.environments import EnvironmentField
 from pants.engine.fs import AddPrefix, Digest, RemovePrefix
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
-from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.internal.build import CargoBinary, CargoBinaryRequest

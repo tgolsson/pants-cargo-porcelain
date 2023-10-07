@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 from pants.core.util_rules.system_binaries import (
     SEARCH_PATHS,
-    BinaryNotFoundError,
     BinaryPath,
     BinaryPathRequest,
     BinaryPaths,

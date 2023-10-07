@@ -17,6 +17,7 @@ backend_packages = [
   "pants.backend.experimental.python.lint.ruff",
 
   "pants_cargo_porcelain",
+  "pants_cargo_porcelain.backends.clippy",
   "pants.backend.plugin_development",
 ]
 
@@ -81,3 +82,6 @@ enabled = false
 
 # [rust]
 # rust_version = "1.72.1"
+
+[clippy]
+args = ["--", "-Dwarnings"]
