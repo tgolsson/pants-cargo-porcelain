@@ -39,9 +39,7 @@ async def find_putative_targets(
         Get(Paths, PathGlobs, req.path_globs("Cargo.toml")),
         Get(
             RustToolchain,
-            RustToolchainRequest(
-                "1.72.1", "x86_64-unknown-linux-gnu", ("rustfmt", "cargo", "clippy")
-            ),
+            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo", "clippy")),
         ),
     )
 
