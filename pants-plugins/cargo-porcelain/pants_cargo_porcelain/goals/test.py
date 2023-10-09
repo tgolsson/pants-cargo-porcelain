@@ -14,14 +14,23 @@ from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem
-from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
+from pants_cargo_porcelain.target_types import (
+    CargoBinaryNameField,
+    CargoLibraryNameField,
+    CargoPackageSourcesField,
+    CargoTestNameField,
+)
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 
 
 @dataclass(frozen=True)
 class CargoTestFieldSet(FieldSet):
-    required_fields = (CargoPackageSourcesField, CargoPackageNameField)
+    required_fields = (CargoPackageSourcesField,)
+
+    library_name: CargoLibraryNameField
+    binary_name: CargoBinaryNameField
+    test_name: CargoTestNameField
 
     sources: CargoPackageSourcesField
     environment: EnvironmentField
@@ -30,7 +39,6 @@ class CargoTestFieldSet(FieldSet):
 @dataclass(frozen=True)
 class CargoTestRequest(TestRequest):
     field_set_type = CargoTestFieldSet
-    #    partitioner_type = PartitionerType.CUSTOM
     tool_subsystem = RustSubsystem
 
 
@@ -43,7 +51,7 @@ class PackageMetadata:
         return None
 
 
-@rule(desc="Format Cargo package", level=LogLevel.DEBUG)
+@rule(desc="Test Cargo package", level=LogLevel.DEBUG)
 async def cargo_test(
     request: CargoTestRequest.Batch[CargoTestFieldSet, PackageMetadata]
 ) -> TestResult:
@@ -58,14 +66,45 @@ async def cargo_test(
     )
 
     cargo_toml_path = f"{request.elements[0].address.spec_path}/Cargo.toml"
-    process_result = await Get(
-        FallibleProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            ("test", f"--manifest-path={cargo_toml_path}"),
-            source_files.snapshot.digest,
-        ),
-    )
+
+    if request.elements[0].library_name.value:
+        process_result = await Get(
+            FallibleProcessResult,
+            CargoProcessRequest(
+                toolchain,
+                ("test", f"--manifest-path={cargo_toml_path}", "--lib"),
+                source_files.snapshot.digest,
+            ),
+        )
+
+    elif request.elements[0].test_name.value:
+        process_result = await Get(
+            FallibleProcessResult,
+            CargoProcessRequest(
+                toolchain,
+                (
+                    "test",
+                    f"--manifest-path={cargo_toml_path}",
+                    f"--test={request.elements[0].test_name.value}",
+                ),
+                source_files.snapshot.digest,
+            ),
+        )
+    elif request.elements[0].binary_name.value:
+        process_result = await Get(
+            FallibleProcessResult,
+            CargoProcessRequest(
+                toolchain,
+                (
+                    "test",
+                    f"--manifest-path={cargo_toml_path}",
+                    f"--bin={request.elements[0].binary_name.value}",
+                ),
+                source_files.snapshot.digest,
+            ),
+        )
+    else:
+        return TestResult.no_tests_found(request, ShowOutput.FAILED)
 
     return TestResult.from_fallible_process_result(
         process_result, request.elements[0].address, ShowOutput.FAILED

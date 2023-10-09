@@ -2,7 +2,7 @@
 pants_version = "2.18.0a0"
 
 pythonpath = [
-   "%(buildroot)s/pants-backends/cargo-porcelain",
+   "%(buildroot)s/pants-plugins/cargo-porcelain",
 ]
 
 backend_packages = [
@@ -72,7 +72,6 @@ args = ["--no-header"]
 execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 
-
 [source]
 root_patterns = []
 marker_filenames = ["pyproject.toml"]
@@ -80,8 +79,8 @@ marker_filenames = ["pyproject.toml"]
 [anonymous-telemetry]
 enabled = false
 
-# [rust]
-# rust_version = "1.72.1"
+[rustup]
+rust_version = "1.72.1"
 
 [clippy]
 args = ["--", "-Dwarnings"]

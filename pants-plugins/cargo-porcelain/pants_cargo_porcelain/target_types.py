@@ -37,7 +37,7 @@ class CargoPackageNameField(StringField):
 
 
 class CargoPackageSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*", "examples/**/*")
+    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*.rs", "examples/**/*")
     expected_file_extensions = (".rs", ".toml", ".lock")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['Cargo.toml', 'src/lib.rs', 'build.rs', '!test_ignore.rs']`"
@@ -71,14 +71,13 @@ class CargoPackageTarget(TargetGenerator):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
+        CargoPackageSourcesField,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
@@ -114,9 +113,14 @@ class CargoBinaryNameField(StringField):
     help = "The name of the binary."
 
 
+class CargoTestNameField(StringField):
+    alias = "test_name"
+    help = "The name of the test."
+
+
 class CargoLibraryNameField(StringField):
-    alias = "binary_name"
-    help = "The name of the binary."
+    alias = "library_name"
+    help = "The name of the library."
 
 
 class CargoPackageTargetImpl(Target):
@@ -147,6 +151,24 @@ class CargoBinaryTarget(Target):
         OutputPathField,
         EnvironmentField,
         CargoBinaryNameField,
+    )
+    help = help_text(
+        """
+
+        """
+    )
+
+
+class CargoTestTarget(Target):
+    alias = "cargo_test"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CargoPackageDependenciesField,
+        CargoPackageSourcesField,
+        SkipCargoTestsField,
+        OutputPathField,
+        EnvironmentField,
+        CargoTestNameField,
     )
     help = help_text(
         """
@@ -217,6 +239,7 @@ async def generate_cargo_generated_target(
 
     libraries = []
     binaries = []
+    tests = []
 
     for target in targets_meta:
         if "bin" in target["kind"]:
@@ -224,6 +247,9 @@ async def generate_cargo_generated_target(
 
         if "lib" in target["kind"]:
             libraries.append(target)
+
+        if "test" in target["kind"]:
+            tests.append(target)
 
     name = request.generator.address.create_generated("package")
     generated_targets = [
@@ -254,6 +280,23 @@ async def generate_cargo_generated_target(
                     CargoPackageDependenciesField.alias: generated_lib_names,
                     CargoBinaryNameField.alias: target["name"],
                     **request.template,
+                },
+                name,
+            )
+        )
+
+    for target in tests:
+        name = request.generator.address.create_generated(target["name"])
+        generated_targets.append(
+            CargoTestTarget(
+                {
+                    **request.template,
+                    CargoPackageDependenciesField.alias: generated_lib_names,
+                    CargoTestNameField.alias: target["name"],
+                    CargoPackageSourcesField.alias: [
+                        *CargoPackageSourcesField.default,
+                        "tests/**/*.rs",
+                    ],
                 },
                 name,
             )
