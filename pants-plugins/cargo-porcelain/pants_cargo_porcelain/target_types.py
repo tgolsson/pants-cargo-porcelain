@@ -89,25 +89,6 @@ class CargoPackageTarget(TargetGenerator):
     )
 
 
-class CargoSourcesField(MultipleSourcesField):
-    default = ""
-    expected_file_extensions = (".rs",)
-
-    help = generate_multiple_sources_field_help_message("Example: `TODO`")
-
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        if not value_or_default:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
-                f"the target's directory, but it was set to {repr(value_or_default)}."
-            )
-        return value_or_default
-
-
 class CargoBinaryNameField(StringField):
     alias = "binary_name"
     help = "The name of the binary."
