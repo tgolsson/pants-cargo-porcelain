@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+import toml
 from pants.engine.fs import (
     Digest,
     DigestContents,
@@ -41,9 +42,12 @@ async def infer_cargo_dependencies(request: InferCargoDependencies) -> InferredD
         Digest, DigestSubset(hydrated_sources.snapshot.digest, PathGlobs([cargo_toml_path]))
     )
     digest_contents = await Get(DigestContents, Digest, new_digest)
+
     for file_content in digest_contents:
         print(file_content.path)
-        print(file_content.content)  # This will be `bytes`.
+
+        print(toml.loads(file_content.content.decode()))
+
     return InferredDependencies(...)
 
 
