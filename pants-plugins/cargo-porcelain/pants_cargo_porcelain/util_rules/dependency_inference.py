@@ -1,6 +1,8 @@
+import pathlib
 from dataclasses import dataclass
 
 import toml
+from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.fs import (
     Digest,
     DigestContents,
@@ -17,9 +19,10 @@ from pants.engine.target import (
     HydrateSourcesRequest,
     InferDependenciesRequest,
     InferredDependencies,
+    Targets,
 )
 
-from pants_cargo_porcelain.target_types import CargoPackageSourcesField
+from pants_cargo_porcelain.target_types import CargoLibraryNameField, CargoPackageSourcesField
 
 
 @dataclass(frozen=True)
@@ -43,12 +46,39 @@ async def infer_cargo_dependencies(request: InferCargoDependencies) -> InferredD
     )
     digest_contents = await Get(DigestContents, Digest, new_digest)
 
+    base_path = pathlib.Path(cargo_toml_path).parent
+
+    all_dependencies = []
     for file_content in digest_contents:
-        print(file_content.path)
+        content = toml.loads(file_content.content.decode())
+        dependencies = content.get("dependencies", {})
 
-        print(toml.loads(file_content.content.decode()))
+        for name, dependency in dependencies.items():
+            if "path" not in dependency:
+                continue
 
-    return InferredDependencies(...)
+            path = dependency["path"]
+
+            dependency_directory = base_path / path
+            candidate_targets = await Get(
+                Targets,
+                RawSpecs(
+                    dir_globs=(DirGlobSpec(f"{dependency_directory}"),),
+                    description_of_origin="the `openapi_document` dependency inference",
+                ),
+            )
+
+            addresses = frozenset(
+                [
+                    target.address
+                    for target in candidate_targets
+                    if target.has_field(CargoLibraryNameField)
+                ]
+            )
+
+            all_dependencies.extend(addresses)
+
+    return InferredDependencies(all_dependencies)
 
 
 def rules():

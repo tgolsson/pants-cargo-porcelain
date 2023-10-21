@@ -247,7 +247,10 @@ async def generate_cargo_generated_target(
         name = request.generator.address.create_generated(target["name"])
         generated_targets.append(
             CargoLibraryTarget(
-                request.template,
+                {
+                    CargoLibraryNameField.alias: target["name"],
+                    **request.template,
+                },
                 name,
             )
         )
