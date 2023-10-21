@@ -3,15 +3,7 @@ from dataclasses import dataclass
 
 import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
-from pants.engine.fs import (
-    Digest,
-    DigestContents,
-    DigestEntries,
-    DigestSubset,
-    Directory,
-    FileEntry,
-    PathGlobs,
-)
+from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, UnionRule, collect_rules, rule
 from pants.engine.target import (
     FieldSet,
@@ -67,18 +59,15 @@ async def infer_cargo_dependencies(request: InferCargoDependencies) -> InferredD
                     description_of_origin="the `openapi_document` dependency inference",
                 ),
             )
-
-            addresses = frozenset(
-                [
-                    target.address
-                    for target in candidate_targets
-                    if target.has_field(CargoLibraryNameField)
-                ]
-            )
+            addresses = [
+                target.address
+                for target in candidate_targets
+                if target.has_field(CargoLibraryNameField)
+            ]
 
             all_dependencies.extend(addresses)
 
-    return InferredDependencies(all_dependencies)
+    return InferredDependencies(sorted(all_dependencies))
 
 
 def rules():
