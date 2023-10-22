@@ -244,7 +244,7 @@ async def generate_cargo_generated_target(
     ]
     generated_lib_names = []
     for target in libraries:
-        name = request.generator.address.create_generated(target["name"])
+        name = request.generator.address.create_generated("library")
         generated_targets.append(
             CargoLibraryTarget(
                 {

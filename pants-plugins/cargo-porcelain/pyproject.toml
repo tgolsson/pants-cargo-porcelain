@@ -16,6 +16,9 @@ classifiers = [
   "Topic :: Software Development :: Build Tools",
 ]
 
+dependencies = [
+   "toml>=0.10.2"
+]
 [project.urls]
 Repository = "https://github.com/tgolsson/pants-cargo-porcelain"
 Code = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/pants-plugins/cargo-porcelain"

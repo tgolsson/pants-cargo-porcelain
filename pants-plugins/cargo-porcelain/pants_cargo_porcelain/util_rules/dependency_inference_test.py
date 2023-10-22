@@ -53,9 +53,7 @@ edition = "2021"
         }
     )
 
-    tgt = rule_runner.get_target(
-        Address("rust", target_name="rust", generated_name="test-with-path")
-    )
+    tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="library"))
 
     inferred_deps = rule_runner.request(
         InferredDependencies,
@@ -69,7 +67,7 @@ edition = "2021"
     assert inferred_deps == InferredDependencies(
         FrozenOrderedSet(
             [
-                Address("rust/inner-path", generated_name="inner-path"),
+                Address("rust/inner-path", generated_name="library"),
             ]
         ),
     )

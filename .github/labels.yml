@@ -1,0 +1,35 @@
+- name: "t: bug"
+  description: Something isn't working
+  color: AE2700
+
+- name: "t: documentation"
+  description: Improvements or additions to documentation
+  color: C1F88C
+
+- name: "t: tools"
+  description: Tools or development setup
+  color: 377FA1
+
+- name: "t: ci"
+  description: Affects CI or CD functionality
+  color: C6D54A
+
+- name: "t: feature"
+  description: A new feature or functionality
+  color: A5D99C
+
+- name: "a: k8s"
+  description: Affects `pants_backend_k8s`
+  color: 326ce5
+
+- name: "a: kustomize"
+  description: Affects `pants_backend_kustomize`
+  color: 5D8BEE
+
+- name: "a: mdbook"
+  description: Affects `pants_backend_mdbook`
+  color: CE412B
+
+- name: "a: oci"
+  description: Affects `pants_backend_oci`
+  color: 262262
