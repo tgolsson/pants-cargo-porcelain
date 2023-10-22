@@ -46,7 +46,7 @@ jobs:
 
       - name: Build docs
         run: |
-          ./get-pants.sh
+          ./.github/get-pants.sh
           /home/runner/bin/pants package docs:docs
 
       - name: Upload artifact
