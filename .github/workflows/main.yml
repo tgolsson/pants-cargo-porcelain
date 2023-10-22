@@ -98,3 +98,35 @@ jobs:
       run: |
         ./.github/get-pants.sh
         /home/runner/bin/pants tailor --check ::
+
+  summarize:
+    needs:
+    - package
+    - check-and-lint
+    - validate-tailor
+    - test
+
+    runs-on: ubuntu-20.04
+    if: success()
+
+    outputs:
+      success: ${{ steps.setoutput.outputs.success }}
+    steps:
+    - id: setoutput
+      run: echo "{name}={value}" >> $GITHUB_OUTPUT
+
+  ci:
+    runs-on: ubuntu-20.04
+    if: always() # always run, so we never skip the check
+    needs:
+    - summarize
+    steps:
+    - run: |
+        passed=${needs.summarize.outputs.success}
+        if [[ $passed == "true" ]]; then
+          echo "CI succeeded"
+          exit 0
+        else
+          echo "CI failed"
+          exit 1
+        fi
