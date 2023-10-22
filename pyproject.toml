@@ -1,14 +1,24 @@
-
 [tool.black]
 line-length = 100
-preview = true
+exclude = '''
+/(
+  # These would already be ignored by pants, but having them here allows for manually running Black if one so wishes.
+  | \.git
+  | \.mypy_cache
+  | dist
+  | \.pants\.d
+  | virtualenvs
+  # This file intentionally contains invalid syntax
+  # It trips black up.
+  | compilation_failure
+)/
+'''
 
 [tool.isort]
 profile = "black"
 line_length = 100
 color_output = true
 known_first_party = ["pants_cargo_porcelain"]
-include_trailing_comma = true
 
 [tool.ruff]
 line-length = 100

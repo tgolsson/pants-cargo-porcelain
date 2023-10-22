@@ -2,23 +2,22 @@
 pants_version = "2.18.0a0"
 
 pythonpath = [
-   "%(buildroot)s/pants-plugins/cargo-porcelain",
+  "%(buildroot)s/pants-plugins/cargo-porcelain",
 ]
 
 backend_packages = [
-  "pants.backend.python",
   "pants.backend.experimental.python",
-
-  "pants.backend.python.lint.black",
-  "pants.backend.python.lint.isort",
-  "pants.backend.python.lint.flake8",
-
-  "pants.backend.shell",
   "pants.backend.experimental.python.lint.ruff",
+  "pants.backend.plugin_development",
+  "pants.backend.python",
+  "pants.backend.python.lint.black",
+  "pants.backend.python.lint.flake8",
+  "pants.backend.python.lint.isort",
+  "pants.backend.shell",
+  "pants.backend.tools.taplo",
 
   "pants_cargo_porcelain",
   "pants_cargo_porcelain.backends.clippy",
-  "pants.backend.plugin_development",
 ]
 
 pants_ignore = [
