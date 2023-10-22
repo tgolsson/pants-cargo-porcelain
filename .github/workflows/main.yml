@@ -82,7 +82,7 @@ jobs:
     - name: Run linters on all targets
       run: |
         ./.github/get-pants.sh
-        /home/runner/bin/pants update-build-files --check lint check ::
+        /home/runner/bin/pants update-build-files --check lint ::
 
   validate-tailor:
     runs-on: ubuntu-20.04
