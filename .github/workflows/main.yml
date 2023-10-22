@@ -113,7 +113,7 @@ jobs:
       success: ${{ steps.setoutput.outputs.success }}
     steps:
     - id: setoutput
-      run: echo "{name}={value}" >> $GITHUB_OUTPUT
+      run: echo "success=true" >> $GITHUB_OUTPUT
 
   ci:
     runs-on: ubuntu-20.04
