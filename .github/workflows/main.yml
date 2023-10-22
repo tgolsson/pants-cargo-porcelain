@@ -15,7 +15,7 @@ jobs:
 
     strategy:
       matrix:
-        pants-version: ["2.17.0", "2.18.0rc3", "2.19.0.dev.0"]
+        pants-version: ["2.18.0rc3", "2.19.0.dev.0"]
 
     steps:
     - uses: actions/checkout@v3
@@ -45,7 +45,7 @@ jobs:
 
     strategy:
       matrix:
-        pants-version: ["2.17.0", "2.18.0rc3", "2.19.0.dev.0"]
+        pants-version: ["2.18.0rc3", "2.19.0.dev.0"]
 
     steps:
     - uses: actions/checkout@v3
