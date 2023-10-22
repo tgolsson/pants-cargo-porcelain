@@ -2,7 +2,7 @@ from . import subsystems
 from . import target_types as tt
 from .goals import fmt, package, tailor, test
 from .internal import build
-from .util_rules import cargo, rustup
+from .util_rules import cargo, dependency_inference, rustup
 
 
 def rules():
@@ -17,6 +17,7 @@ def rules():
         *package.rules(),
         *fmt.rules(),
         *test.rules(),
+        *dependency_inference.rules(),
     ]
 
 

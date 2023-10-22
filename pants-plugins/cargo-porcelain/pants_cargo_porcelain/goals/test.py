@@ -4,13 +4,12 @@ from dataclasses import dataclass
 
 from pants.core.goals.test import ShowOutput, TestRequest, TestResult
 from pants.core.util_rules.environments import EnvironmentField
-from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet
+from pants.engine.target import FieldSet, TransitiveTargets, TransitiveTargetsRequest
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem
@@ -60,9 +59,18 @@ async def cargo_test(
         RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
     )
 
+    transitive_targets = await Get(
+        TransitiveTargets, TransitiveTargetsRequest([request.elements[0].address])
+    )
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest([request.elements[0].sources]),
+        SourceFilesRequest(
+            [
+                tgt[CargoPackageSourcesField]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(CargoPackageSourcesField)
+            ]
+        ),
     )
 
     cargo_toml_path = f"{request.elements[0].address.spec_path}/Cargo.toml"
@@ -90,6 +98,7 @@ async def cargo_test(
                 source_files.snapshot.digest,
             ),
         )
+
     elif request.elements[0].binary_name.value:
         process_result = await Get(
             FallibleProcessResult,
@@ -103,8 +112,9 @@ async def cargo_test(
                 source_files.snapshot.digest,
             ),
         )
+
     else:
-        return TestResult.no_tests_found(request, ShowOutput.FAILED)
+        return TestResult.no_tests_found(request.elements[0].address, ShowOutput.FAILED)
 
     return TestResult.from_fallible_process_result(
         process_result, request.elements[0].address, ShowOutput.FAILED
