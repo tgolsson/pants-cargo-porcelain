@@ -122,7 +122,7 @@ jobs:
     - summarize
     steps:
     - run: |
-        passed=${needs.summarize.outputs.success}
+        passed="${{needs.summarize.outputs.success}}"
         if [[ $passed == "true" ]]; then
           echo "CI succeeded"
           exit 0
