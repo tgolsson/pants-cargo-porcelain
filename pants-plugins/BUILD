@@ -2,9 +2,9 @@ pants_requirements(name="pants", resolve="pants-plugins")
 
 python_requirements(
     name="python-requirements-pants-plugins",
-        source="cargo-porcelain/pyproject.toml",
-        resolve="pants-plugins",
-    )
+    source="cargo-porcelain/pyproject.toml",
+    resolve="pants-plugins",
+)
 
 python_requirement(
     name="pytest-base",
@@ -17,7 +17,7 @@ python_requirement(
 )
 
 name_to_constraint = {
-    "pants-current": "==2.18.0rc3", # TBD[TSolberg]: Developing against 2.18 until 2.18.0 is released.
+    "pants-current": "==2.18.0rc3",  # TBD[TSolberg]: Developing against 2.18 until 2.18.0 is released.
     "pants-next": "==2.19.0.dev0",
 }
 
