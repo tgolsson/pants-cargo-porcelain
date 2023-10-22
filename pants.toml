@@ -1,9 +1,7 @@
 [GLOBAL]
 pants_version = "2.18.0a0"
 
-pythonpath = [
-  "%(buildroot)s/pants-plugins/cargo-porcelain",
-]
+pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 
 backend_packages = [
   "pants.backend.experimental.python",
@@ -20,12 +18,7 @@ backend_packages = [
   "pants_cargo_porcelain.backends.clippy",
 ]
 
-pants_ignore = [
-    ".*/",
-    "/dist/",
-    "__pycache__",
-    "**/pdm_build.py",
-]
+pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
 
 
 [python]

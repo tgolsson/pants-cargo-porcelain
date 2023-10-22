@@ -4,20 +4,20 @@ from dataclasses import dataclass
 
 from pants.core.goals.lint import LintResult, LintTargetsRequest, Partitions
 from pants.core.util_rules.partitions import Partition
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.backends.clippy.subsystem import ClippySubsystem
-from pants_cargo_porcelain.internal.target import platform_to_target
 from pants_cargo_porcelain.subsystems import RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 
 
 @dataclass(frozen=True)
@@ -70,14 +70,12 @@ async def run_cargo_lint(
     clippy: ClippySubsystem,
     platform: Platform,
 ) -> LintResult:
-    toolchain = await Get(
-        RustToolchain,
-        RustToolchainRequest(rustup_tool.rust_version, platform_to_target(platform), ("clippy",)),
-    )
-
-    source_files = await Get(
-        SourceFiles,
-        SourceFilesRequest([request.elements[0].sources]),
+    toolchain, source_files = await MultiGet(
+        Get(
+            RustToolchain,
+            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
+        ),
+        Get(SourceFiles, CargoSourcesRequest(frozenset([request.elements[0].address]))),
     )
 
     cargo_toml_path = f"{request.partition_metadata.address.spec_path}/Cargo.toml"
