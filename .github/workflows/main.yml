@@ -1,0 +1,132 @@
+name: Run CI
+
+on:
+  push:
+    branches: [ "main" ]
+
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        pants-version: ["2.18.0rc3", "2.19.0.dev.0"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Tell Pants to use Python 3.9
+      run: |
+        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['==3.9.*']" >> $GITHUB_ENV
+
+    - name: Initialize Pants
+      uses: pantsbuild/actions/init-pants@main
+      with:
+        # cache0 makes it easy to bust the cache if needed
+        gha-cache-key: cache1-test-py3.9-pants${{ matrix.pants-version }}
+        named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
+
+    - name: Test everything
+      run: |
+        ./.github/get-pants.sh
+        /home/runner/bin/pants test ::
+
+  package:
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        pants-version: ["2.18.0rc3", "2.19.0.dev.0"]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Tell Pants to use Python 3.9
+      run: |
+        echo "PANTS_VERSION=${{ matrix.pants-version }}" >> $GITHUB_ENV
+
+    - name: Initialize Pants
+      uses: pantsbuild/actions/init-pants@main
+      with:
+        gha-cache-key: cache1-package-py3.9-pants${{ matrix.pants-version }}
+        named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
+
+    - name: Package all targets
+      run: |
+        ./.github/get-pants.sh
+        /home/runner/bin/pants package ::
+
+  check-and-lint:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Run linters on all targets
+      run: |
+        ./.github/get-pants.sh
+        /home/runner/bin/pants update-build-files --check lint ::
+
+  validate-tailor:
+    runs-on: ubuntu-20.04
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: Validate that tailor files are up to date
+      run: |
+        ./.github/get-pants.sh
+        /home/runner/bin/pants tailor --check ::
+
+  summarize:
+    needs:
+    - package
+    - check-and-lint
+    - validate-tailor
+    - test
+
+    runs-on: ubuntu-20.04
+    if: success()
+
+    outputs:
+      success: ${{ steps.setoutput.outputs.success }}
+    steps:
+    - id: setoutput
+      run: echo "success=true" >> $GITHUB_OUTPUT
+
+  ci:
+    runs-on: ubuntu-20.04
+    if: always() # always run, so we never skip the check
+    needs:
+    - summarize
+    steps:
+    - run: |
+        passed="${{needs.summarize.outputs.success}}"
+        if [[ $passed == "true" ]]; then
+          echo "CI succeeded"
+          exit 0
+        else
+          echo "CI failed"
+          exit 1
+        fi

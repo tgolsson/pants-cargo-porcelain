@@ -7,7 +7,7 @@ from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
@@ -17,6 +17,7 @@ from pants_cargo_porcelain.subsystems import RustSubsystem
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 
 
 @dataclass(frozen=True)
@@ -59,7 +60,7 @@ async def partition(
 
         partitions.append(
             Partition(
-                source_files.files,
+                frozenset([f for f in source_files.files if f.endswith("rs")]),
                 PackageMetadata(
                     address=field_set.address,
                 ),
@@ -71,9 +72,12 @@ async def partition(
 
 @rule(desc="Format Cargo package", level=LogLevel.DEBUG)
 async def cargo_fmt(request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMetadata]) -> FmtResult:
-    toolchain = await Get(
-        RustToolchain,
-        RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("rustfmt", "cargo")),
+    toolchain, source_files = await MultiGet(
+        Get(
+            RustToolchain,
+            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
+        ),
+        Get(SourceFiles, CargoSourcesRequest(frozenset([request.partition_metadata.address]))),
     )
 
     cargo_toml_path = f"{request.partition_metadata.address.spec_path}/Cargo.toml"
@@ -82,7 +86,7 @@ async def cargo_fmt(request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMeta
         CargoProcessRequest(
             toolchain,
             ("fmt", f"--manifest-path={cargo_toml_path}"),
-            request.snapshot.digest,
+            source_files.snapshot.digest,
             output_files=request.files,
         ),
     )

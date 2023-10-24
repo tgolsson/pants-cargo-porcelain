@@ -1,32 +1,24 @@
 [GLOBAL]
 pants_version = "2.18.0a0"
 
-pythonpath = [
-   "%(buildroot)s/pants-plugins/cargo-porcelain",
-]
+pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 
 backend_packages = [
-  "pants.backend.python",
   "pants.backend.experimental.python",
-
-  "pants.backend.python.lint.black",
-  "pants.backend.python.lint.isort",
-  "pants.backend.python.lint.flake8",
-
-  "pants.backend.shell",
   "pants.backend.experimental.python.lint.ruff",
+  "pants.backend.plugin_development",
+  "pants.backend.python",
+  "pants.backend.python.lint.black",
+  "pants.backend.python.lint.flake8",
+  "pants.backend.python.lint.isort",
+  "pants.backend.shell",
+  "pants.backend.tools.taplo",
 
   "pants_cargo_porcelain",
   "pants_cargo_porcelain.backends.clippy",
-  "pants.backend.plugin_development",
 ]
 
-pants_ignore = [
-    ".*/",
-    "/dist/",
-    "__pycache__",
-    "**/pdm_build.py",
-]
+pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
 
 
 [python]
@@ -37,9 +29,8 @@ default_resolve = "pants-plugins"
 
 [python.resolves]
 pants-plugins = "pants-plugins/pants.lock"
-pants-216 = "pants-plugins/216.lock"
-pants-217 = "pants-plugins/217.lock"
-pants-218 = "pants-plugins/218.lock"
+pants-current = "pants-plugins/current.lock"
+pants-next = "pants-plugins/next.lock"
 
 pytest = "locks/tools/pytest.lock"
 isort = "locks/tools/isort.lock"
@@ -48,9 +39,8 @@ black = "locks/tools/black.lock"
 
 [python.resolves_to_interpreter_constraints]
 pants-plugins = [">=3.7,<3.10"]
-pants-216 = [">=3.7,<3.10"]
-pants-217 = [">=3.7,<3.10"]
-pants-218 = [">=3.7,<3.10"]
+pants-current = [">=3.7,<3.10"]
+pants-next = [">=3.7,<3.10"]
 
 black = [">=3.9,<3.10"]
 

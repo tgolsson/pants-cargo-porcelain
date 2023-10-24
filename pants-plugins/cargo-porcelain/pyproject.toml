@@ -2,12 +2,10 @@
 name = "pants_cargo_porcelain"
 description = ""
 version = "0.4.0"
-authors = [
-    { name = "Tom Solberg", email = "me@sbg.dev" }
-]
+authors = [{ name = "Tom Solberg", email = "me@sbg.dev" }]
 
 readme = "README.md"
-license = {file = "LICENSE-MIT.txt"}
+license = { file = "LICENSE-MIT.txt" }
 keywords = ["pantsbuild", "pants"]
 
 classifiers = [
@@ -16,6 +14,7 @@ classifiers = [
   "Topic :: Software Development :: Build Tools",
 ]
 
+dependencies = ["toml>=0.10.2"]
 [project.urls]
 Repository = "https://github.com/tgolsson/pants-cargo-porcelain"
 Code = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/pants-plugins/cargo-porcelain"

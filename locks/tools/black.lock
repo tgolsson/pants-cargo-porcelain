@@ -31,33 +31,28 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6ccd59584cc834b6d127628713e4b6b968e5f79572da66284532525a042549f9",
-              "url": "https://files.pythonhosted.org/packages/28/c7/150de595f9e5ee1efffeb398acfac3e37d218171100049c77e494326dc4b/black-23.9.1-py3-none-any.whl"
+              "hash": "e223b731a0e025f8ef427dd79d8cd69c167da807f5710add30cdf131f13dd62e",
+              "url": "https://files.pythonhosted.org/packages/97/7f/87ff819b63ce86d7cd44a3004ea14101f0dd81971dad9c636fdda600d9c6/black-23.10.0-py3-none-any.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c619f063c2d68f19b2d7270f4cf3192cb81c9ec5bc5ba02df91471d0b88c4c5c",
-              "url": "https://files.pythonhosted.org/packages/04/77/bd9578cb5a418d5934fedb15f0297e19eed06278547c7d8c9022f4a348d2/black-23.9.1-cp39-cp39-macosx_10_16_arm64.whl"
+              "hash": "31b9f87b277a68d0e99d2905edae08807c007973eaa609da5f0c62def6b7c0bd",
+              "url": "https://files.pythonhosted.org/packages/2d/e0/8433441b0236b9d795ffbf5750f98144e0378b6e20401ba4d2db30b99a5c/black-23.10.0.tar.gz"
             },
             {
               "algorithm": "sha256",
-              "hash": "24b6b3ff5c6d9ea08a8888f6977eae858e1f340d7260cf56d70a49823236b62d",
-              "url": "https://files.pythonhosted.org/packages/12/c3/257adbdbf2cc60bf844b5c0e3791a9d49e4fb4f7bcd8a2e875824ca0b7bc/black-23.9.1.tar.gz"
+              "hash": "a3c2ddb35f71976a4cfeca558848c2f2f89abc86b06e8dd89b5a65c1e6c0f22a",
+              "url": "https://files.pythonhosted.org/packages/7d/58/06645bc2a80c19837812a6098e1d41cfc22db9393d8cd93877d40ee7b2af/black-23.10.0-cp39-cp39-macosx_10_16_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "6a3b50e4b93f43b34a9d3ef00d9b6728b4a722c997c99ab09102fd5efdb88325",
-              "url": "https://files.pythonhosted.org/packages/57/4f/0b4cd9039fd70f94db313afccd2e5084af0c86a1eb9f880d61e530f23f1a/black-23.9.1-cp39-cp39-macosx_10_16_universal2.whl"
+              "hash": "76baba9281e5e5b230c9b7f83a96daf67a95e919c2dfc240d9e6295eab7b9204",
+              "url": "https://files.pythonhosted.org/packages/81/2e/3000b5f9f0ba1c4aa99642e105c40bf96497e6f9a5b970967d9039fe1b13/black-23.10.0-cp39-cp39-macosx_10_16_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "c46767e8df1b7beefb0899c4a95fb43058fa8500b6db144f4ff3ca38eb2f6393",
-              "url": "https://files.pythonhosted.org/packages/a6/34/0607a7f58bae0c45eb5efde4db4d2517e3e1ca70a568e145d43e3ca5d641/black-23.9.1-cp39-cp39-macosx_10_16_x86_64.whl"
-            },
-            {
-              "algorithm": "sha256",
-              "hash": "50254ebfa56aa46a9fdd5d651f9637485068a1adf42270148cd101cdf56e0ad9",
-              "url": "https://files.pythonhosted.org/packages/e2/97/975cfd8fe4e06aac6e438ba08add0ae73412f0d5cbfce868f571d6443332/black-23.9.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
+              "hash": "db451a3363b1e765c172c3fd86213a4ce63fb8524c938ebd82919bf2a6e28c6a",
+              "url": "https://files.pythonhosted.org/packages/df/c6/1aa616f722fbb9591b87f5fec6556d490f700ede071a4e5096cef2b52025/black-23.10.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl"
             }
           ],
           "project_name": "black",
@@ -76,7 +71,7 @@
             "uvloop>=0.15.2; extra == \"uvloop\""
           ],
           "requires_python": ">=3.8",
-          "version": "23.9.1"
+          "version": "23.10.0"
         },
         {
           "artifacts": [

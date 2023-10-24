@@ -4,12 +4,12 @@ from dataclasses import dataclass
 
 from pants.core.goals.test import ShowOutput, TestRequest, TestResult
 from pants.core.util_rules.environments import EnvironmentField
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Address
-from pants.engine.internals.selectors import Get
+from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
-from pants.engine.target import FieldSet, TransitiveTargets, TransitiveTargetsRequest
+from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem
@@ -21,6 +21,7 @@ from pants_cargo_porcelain.target_types import (
 )
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 
 
 @dataclass(frozen=True)
@@ -54,23 +55,12 @@ class PackageMetadata:
 async def cargo_test(
     request: CargoTestRequest.Batch[CargoTestFieldSet, PackageMetadata]
 ) -> TestResult:
-    toolchain = await Get(
-        RustToolchain,
-        RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
-    )
-
-    transitive_targets = await Get(
-        TransitiveTargets, TransitiveTargetsRequest([request.elements[0].address])
-    )
-    source_files = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [
-                tgt[CargoPackageSourcesField]
-                for tgt in transitive_targets.closure
-                if tgt.has_field(CargoPackageSourcesField)
-            ]
+    toolchain, source_files = await MultiGet(
+        Get(
+            RustToolchain,
+            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
         ),
+        Get(SourceFiles, CargoSourcesRequest(frozenset([request.elements[0].address]))),
     )
 
     cargo_toml_path = f"{request.elements[0].address.spec_path}/Cargo.toml"

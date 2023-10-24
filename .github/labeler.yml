@@ -1,0 +1,21 @@
+"t: documentation":
+  - '**/README.md'
+  - 'README.md'
+  - 'docs/*'
+  - 'docs/**/*'
+
+"t: tools":
+  - '.flake8'
+  - 'pants.toml'
+
+"t: ci":
+  - '.github/*'
+  - '.github/**/*'
+  - 'pants.ci.toml'
+
+"a: examples":
+  - 'examples/**/*'
+
+"a: plugin":
+  - 'pants-plugins/cargo-porcelain/*'
+  - 'pants-plugins/mdbook/**/*'
