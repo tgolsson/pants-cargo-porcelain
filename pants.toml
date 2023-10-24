@@ -23,7 +23,7 @@ pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
 
 [python]
 tailor_pex_binary_targets = true
-interpreter_constraints = [">=3.7,<3.10"]
+interpreter_constraints = ["==3.9.*"]
 enable_resolves = true
 default_resolve = "pants-plugins"
 
@@ -38,9 +38,9 @@ ipython = "locks/tools/ipython.lock"
 black = "locks/tools/black.lock"
 
 [python.resolves_to_interpreter_constraints]
-pants-plugins = [">=3.7,<3.10"]
-pants-current = [">=3.7,<3.10"]
-pants-next = [">=3.7,<3.10"]
+pants-plugins = ["==3.9.*"]
+pants-current = ["==3.9.*"]
+pants-next = ["==3.9.*"]
 
 black = [">=3.9,<3.10"]
 
