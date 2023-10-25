@@ -62,7 +62,9 @@ async def cargo_test(
     toolchain, source_files = await MultiGet(
         Get(
             RustToolchain,
-            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
+            RustToolchainRequest(
+                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
         Get(SourceFiles, CargoSourcesRequest(frozenset([request.elements[0].address]))),
     )

@@ -52,7 +52,9 @@ async def build_cargo_binary(
         ),
         Get(
             RustToolchain,
-            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ()),
+            RustToolchainRequest(
+                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
     )
 
