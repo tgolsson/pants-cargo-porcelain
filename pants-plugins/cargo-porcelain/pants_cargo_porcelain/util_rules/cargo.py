@@ -111,9 +111,14 @@ async def make_cargo_process(
         #        "CARGO_LOG": "cargo::core::compiler::fingerprint=trace",
     }
 
+    output_files = req.output_files
     if req.cache_path:
         append_only_caches = FrozenDict({"ctc": ".cargo-target-cache", **append_only_caches})
         env["CARGO_TARGET_DIR"] = f".cargo-target-cache/{req.cache_path}"
+
+        output_files = tuple(
+            f.replace("{cache_path}", env["CARGO_TARGET_DIR"]) for f in output_files
+        )
 
     command = " ".join(req.command)
     script = f"""
@@ -126,9 +131,6 @@ async def make_cargo_process(
 
     digest = await Get(Digest, CreateDigest([FileContent("run.sh", script.encode())]))
     merged_digest = await Get(Digest, MergeDigests([digest, req.digest]))
-    output_files = tuple(
-        f.replace("{cache_path}", env["CARGO_TARGET_DIR"]) for f in req.output_files
-    )
 
     return Process(
         argv=(bash.path, "run.sh"),
