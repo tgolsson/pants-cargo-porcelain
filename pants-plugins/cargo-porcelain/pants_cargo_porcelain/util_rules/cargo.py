@@ -126,12 +126,16 @@ async def make_cargo_process(
 
     digest = await Get(Digest, CreateDigest([FileContent("run.sh", script.encode())]))
     merged_digest = await Get(Digest, MergeDigests([digest, req.digest]))
+    output_files = tuple(
+        f.replace("{cache_path}", env["CARGO_TARGET_DIR"]) for f in req.output_files
+    )
+
     return Process(
         argv=(bash.path, "run.sh"),
         input_digest=merged_digest,
         description=f"Run {req.command} with {req.toolchain}",
         append_only_caches=append_only_caches,
-        output_files=req.output_files,
+        output_files=output_files,
         immutable_input_digests=binary_shims.immutable_input_digests,
         level=LogLevel.DEBUG,
         env=env,

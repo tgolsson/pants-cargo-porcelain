@@ -62,14 +62,12 @@ async def build_cargo_binary(
             toolchain,
             (
                 "build",
-                "-v",
-                "-v",
                 f"--manifest-path={req.address.spec_path}/Cargo.toml",
                 "--locked",
                 f"--bin={req.binary_name}",
             ),
             source_files.snapshot.digest,
-            output_files=(f"target/debug/{req.binary_name}",),
+            output_files=(f"{{cache_path}}/debug/{req.binary_name}",),
             cache_path=req.address.spec_path,
         ),
     )

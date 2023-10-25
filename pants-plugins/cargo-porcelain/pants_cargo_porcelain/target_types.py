@@ -8,6 +8,7 @@ from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import (
@@ -26,6 +27,7 @@ from pants.engine.target import (
 from pants.engine.unions import UnionRule
 from pants.util.strutil import help_text
 
+from pants_cargo_porcelain.internal.build import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
@@ -83,8 +85,10 @@ class CargoPackageTarget(TargetGenerator):
         EnvironmentField,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text("""
-        """)
+    help = help_text(
+        """
+        """
+    )
 
 
 class CargoBinaryNameField(StringField):
@@ -113,9 +117,11 @@ class CargoPackageTargetImpl(Target):
         EnvironmentField,
         CargoPackageNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoBinaryTarget(Target):
@@ -129,9 +135,11 @@ class CargoBinaryTarget(Target):
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoTestTarget(Target):
@@ -145,9 +153,11 @@ class CargoTestTarget(Target):
         EnvironmentField,
         CargoTestNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoLibraryTarget(Target):
@@ -161,9 +171,11 @@ class CargoLibraryTarget(Target):
         EnvironmentField,
         CargoLibraryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class GenerateCargoTargetsRequest(GenerateTargetsRequest):
@@ -175,6 +187,7 @@ async def generate_cargo_generated_target(
     request: GenerateCargoTargetsRequest,
     rust: RustSubsystem,
     rustup: RustupTool,
+    platform: Platform,
 ) -> GeneratedTargets:
     source_files, toolchain = await MultiGet(
         Get(
@@ -185,9 +198,7 @@ async def generate_cargo_generated_target(
         ),
         Get(
             RustToolchain,
-            RustToolchainRequest(
-                "1.72.1", "x86_64-unknown-linux-gnu", ("rustfmt", "cargo", "clippy")
-            ),
+            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ()),
         ),
     )
 

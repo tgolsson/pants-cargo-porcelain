@@ -8,12 +8,14 @@ from pants.core.util_rules.partitions import Partition, PartitionerType, Partiti
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.subsystems import RustSubsystem
+from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
@@ -71,11 +73,17 @@ async def partition(
 
 
 @rule(desc="Format Cargo package", level=LogLevel.DEBUG)
-async def cargo_fmt(request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMetadata]) -> FmtResult:
+async def cargo_fmt(
+    request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMetadata],
+    rustup: RustupTool,
+    platform: Platform,
+) -> FmtResult:
     toolchain, source_files = await MultiGet(
         Get(
             RustToolchain,
-            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
+            RustToolchainRequest(
+                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
         Get(SourceFiles, CargoSourcesRequest(frozenset([request.partition_metadata.address]))),
     )

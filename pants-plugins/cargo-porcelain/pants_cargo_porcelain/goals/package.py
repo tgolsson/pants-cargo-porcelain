@@ -40,7 +40,11 @@ async def package_cargo_binary(field_set: CargoBinaryFieldSet) -> BuiltPackage:
         CargoBinaryRequest(field_set.address, field_set.sources, field_set.binary_name.value),
     )
 
-    removed_prefix = await Get(Digest, RemovePrefix(binary.digest, "target/debug"))
+    removed_prefix = await Get(
+        Digest,
+        RemovePrefix(binary.digest, f".cargo-target-cache/{field_set.address.spec_path}/debug"),
+    )
+
     renamed_output_digest = await Get(
         Digest, AddPrefix(removed_prefix, str(output_filename.parent))
     )
