@@ -1,4 +1,4 @@
-from . import subsystems
+from . import subsystems, target_generator
 from . import target_types as tt
 from .goals import fmt, package, run, tailor, test
 from .internal import build
@@ -20,6 +20,7 @@ def rules():
         *test.rules(),
         *dependency_inference.rules(),
         *sandbox.rules(),
+        *target_generator.rules(),
     ]
 
 
