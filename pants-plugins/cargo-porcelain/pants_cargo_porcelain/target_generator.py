@@ -49,7 +49,9 @@ async def generate_cargo_generated_target(
         ),
         Get(
             RustToolchain,
-            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ()),
+            RustToolchainRequest(
+                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
     )
 
