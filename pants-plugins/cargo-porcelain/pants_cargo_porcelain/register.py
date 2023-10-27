@@ -1,6 +1,6 @@
-from . import subsystems
+from . import subsystems, target_generator
 from . import target_types as tt
-from .goals import fmt, package, tailor, test
+from .goals import fmt, package, run, tailor, test
 from .internal import build
 from .util_rules import cargo, dependency_inference, rustup, sandbox
 
@@ -9,8 +9,9 @@ def rules():
     return [
         *subsystems.rules(),
         *tailor.rules(),
-        #        *package.rules(),
+        *package.rules(),
         *rustup.rules(),
+        *run.rules(),
         *tt.rules(),
         *cargo.rules(),
         *build.rules(),
@@ -19,6 +20,7 @@ def rules():
         *test.rules(),
         *dependency_inference.rules(),
         *sandbox.rules(),
+        *target_generator.rules(),
     ]
 
 

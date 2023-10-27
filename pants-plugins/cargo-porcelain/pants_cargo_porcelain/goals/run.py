@@ -1,10 +1,11 @@
 import os.path
 
-from pants.backend.go.goals.package_binary import CargoBinaryFieldSet
 from pants.core.goals.package import BuiltPackage, PackageFieldSet
 from pants.core.goals.run import RunRequest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
+
+from pants_cargo_porcelain.goals.package import CargoBinaryFieldSet
 
 
 @rule

@@ -7,12 +7,14 @@ from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.process import FallibleProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.subsystems import RustSubsystem
+from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import (
     CargoBinaryNameField,
     CargoLibraryNameField,
@@ -53,12 +55,16 @@ class PackageMetadata:
 
 @rule(desc="Test Cargo package", level=LogLevel.DEBUG)
 async def cargo_test(
-    request: CargoTestRequest.Batch[CargoTestFieldSet, PackageMetadata]
+    request: CargoTestRequest.Batch[CargoTestFieldSet, PackageMetadata],
+    rustup: RustupTool,
+    platform: Platform,
 ) -> TestResult:
     toolchain, source_files = await MultiGet(
         Get(
             RustToolchain,
-            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
+            RustToolchainRequest(
+                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
         Get(SourceFiles, CargoSourcesRequest(frozenset([request.elements[0].address]))),
     )

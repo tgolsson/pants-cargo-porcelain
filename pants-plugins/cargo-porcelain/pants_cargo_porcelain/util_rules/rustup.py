@@ -102,6 +102,7 @@ class FileLock:
 @rule(desc="Get Rust toolchain", level=LogLevel.DEBUG)
 async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
     rustup_binary = await Get(RustupBinary, RustupBinaryRequest())
+
     lock_file_path = os.path.join(get_pants_cachedir(), "locks", ".rustup")
     with FileLock(lock_file_path):
         _ = await Get(

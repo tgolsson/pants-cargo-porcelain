@@ -13,6 +13,7 @@ from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.backends.clippy.subsystem import ClippySubsystem
+from pants_cargo_porcelain.internal.build import platform_to_target
 from pants_cargo_porcelain.subsystems import RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
@@ -73,7 +74,9 @@ async def run_cargo_lint(
     toolchain, source_files = await MultiGet(
         Get(
             RustToolchain,
-            RustToolchainRequest("1.72.1", "x86_64-unknown-linux-gnu", ("cargo",)),
+            RustToolchainRequest(
+                rustup_tool.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+            ),
         ),
         Get(SourceFiles, CargoSourcesRequest(frozenset([request.elements[0].address]))),
     )
