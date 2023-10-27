@@ -18,6 +18,7 @@ from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.internal.build import CargoBinary, CargoBinaryRequest
+from pants_cargo_porcelain.subsystems import RustSubsystem
 from pants_cargo_porcelain.target_types import CargoBinaryNameField, CargoPackageSourcesField
 
 
@@ -33,16 +34,25 @@ class CargoBinaryFieldSet(PackageFieldSet, RunFieldSet):
 
 
 @rule(desc="Package Cargo binary", level=LogLevel.DEBUG)
-async def package_cargo_binary(field_set: CargoBinaryFieldSet) -> BuiltPackage:
+async def package_cargo_binary(
+    field_set: CargoBinaryFieldSet,
+    rust: RustSubsystem,
+) -> BuiltPackage:
     output_filename = PurePath(field_set.output_path.value_or_default(file_ending=None))
     binary = await Get(
         CargoBinary,
         CargoBinaryRequest(field_set.address, field_set.sources, field_set.binary_name.value),
     )
 
+    build_level = "debug"
+    if rust.release:
+        build_level = "release"
+
     removed_prefix = await Get(
         Digest,
-        RemovePrefix(binary.digest, f".cargo-target-cache/{field_set.address.spec_path}/debug"),
+        RemovePrefix(
+            binary.digest, f".cargo-target-cache/{field_set.address.spec_path}/{build_level}"
+        ),
     )
 
     renamed_output_digest = await Get(

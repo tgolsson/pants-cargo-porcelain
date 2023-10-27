@@ -18,6 +18,12 @@ class RustSubsystem(Subsystem):
         advanced=True,
     )
 
+    release = BoolOption(
+        default=False,
+        help=softwrap("""If true, build in release mode."""),
+        advanced=True,
+    )
+
     skip = SkipOption("fmt", "lint")
 
 

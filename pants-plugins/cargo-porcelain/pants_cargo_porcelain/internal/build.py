@@ -43,7 +43,10 @@ def platform_to_target(platform: Platform):
 
 @rule
 async def build_cargo_binary(
-    req: CargoBinaryRequest, rust: RustSubsystem, rustup: RustupTool, platform: Platform
+    req: CargoBinaryRequest,
+    rust: RustSubsystem,
+    rustup: RustupTool,
+    platform: Platform,
 ) -> CargoBinary:
     source_files, toolchain = await MultiGet(
         Get(
@@ -58,18 +61,27 @@ async def build_cargo_binary(
         ),
     )
 
+    extra_args = []
+    if rust.release:
+        extra_args.append("--release")
+
+    build_level = "debug"
+    if rust.release:
+        build_level = "release"
+
     process_result = await Get(
         ProcessResult,
         CargoProcessRequest(
             toolchain,
             (
                 "build",
+                *extra_args,
                 f"--manifest-path={req.address.spec_path}/Cargo.toml",
                 "--locked",
                 f"--bin={req.binary_name}",
             ),
             source_files.snapshot.digest,
-            output_files=(f"{{cache_path}}/debug/{req.binary_name}",),
+            output_files=(f"{{cache_path}}/{build_level}/{req.binary_name}",),
             cache_path=req.address.spec_path,
         ),
     )
