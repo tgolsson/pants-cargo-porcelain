@@ -49,14 +49,6 @@ jobs:
       - name: Fetch tags
         run: git fetch --prune --unshallow --tags
 
-      - name: Set up Python 3.8
-        uses: actions/setup-python@v3
-        with:
-          python-version: 3.8
-      - name: Tell Pants to use Python 3.8
-        run: 'echo "PY=python3.8" >> $GITHUB_ENV
-          echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=[''==3.8.*'']" >> $GITHUB_ENV
-          '
       - name: Initialize Pants
         uses: pantsbuild/actions/init-pants@main
         with:
@@ -65,7 +57,7 @@ jobs:
           named-caches-hash: ${{ hashFiles('pants-plugins/lock.txt') }}
 
       - name: Build Packages
-        run: "./pants package //pants-plugins::"
+        run: "pants package //pants-plugins::"
 
       - name: Delete old release assets
         uses: mknejp/delete-release-assets@v1
