@@ -96,6 +96,8 @@ async def make_cargo_process(
         BinaryShimsRequest.for_binaries(
             "cc",
             "ld",
+            "as",
+            "ar",
             "realpath",
             rationale="rustc",
             search_path=SEARCH_PATHS,
