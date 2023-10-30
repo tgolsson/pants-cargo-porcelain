@@ -1,5 +1,5 @@
 [GLOBAL]
-pants_version = "2.18.0a0"
+pants_version = "2.18.0rc3"
 
 pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 
