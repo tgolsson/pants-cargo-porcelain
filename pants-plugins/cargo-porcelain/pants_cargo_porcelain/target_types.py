@@ -28,7 +28,7 @@ class CargoWorkspaceSourcesField(MultipleSourcesField):
     )
 
 
-class CargoWorkspace(Target):
+class CargoWorkspaceTarget(Target):
     alias = "cargo_workspace"
     core_fields = (*COMMON_TARGET_FIELDS, CargoWorkspaceSourcesField)
 
@@ -190,4 +190,5 @@ def target_types():
         CargoPackageTargetImpl,
         CargoBinaryTarget,
         CargoLibraryTarget,
+        CargoWorkspaceTarget,
     ]
