@@ -20,6 +20,19 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 
+class CargoWorkspaceSourcesField(MultipleSourcesField):
+    default = ("Cargo.toml", "Cargo.lock")
+    expected_file_extensions = (".toml", ".lock")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Cargo.toml', 'Cargo.lock']`"
+    )
+
+
+class CargoWorkspace(Target):
+    alias = "cargo_workspace"
+    core_fields = (*COMMON_TARGET_FIELDS, CargoWorkspaceSourcesField)
+
+
 class CargoPackageNameField(StringField):
     alias = "package_name"
     help = "The name of the package."
@@ -72,8 +85,10 @@ class CargoPackageTarget(TargetGenerator):
         EnvironmentField,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text("""
-        """)
+    help = help_text(
+        """
+        """
+    )
 
 
 class CargoBinaryNameField(StringField):
@@ -102,9 +117,11 @@ class CargoPackageTargetImpl(Target):
         EnvironmentField,
         CargoPackageNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoBinaryTarget(Target):
@@ -118,9 +135,11 @@ class CargoBinaryTarget(Target):
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoTestTarget(Target):
@@ -134,9 +153,11 @@ class CargoTestTarget(Target):
         EnvironmentField,
         CargoTestNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoLibraryTarget(Target):
@@ -150,9 +171,11 @@ class CargoLibraryTarget(Target):
         EnvironmentField,
         CargoLibraryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 def rules():

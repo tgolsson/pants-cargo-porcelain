@@ -17,7 +17,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
-from pants_cargo_porcelain.target_types import CargoPackageTarget
+from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
 
 
 @dataclass(frozen=True)
