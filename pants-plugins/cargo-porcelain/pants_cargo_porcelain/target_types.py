@@ -38,6 +38,11 @@ class CargoPackageNameField(StringField):
     help = "The name of the package."
 
 
+class _CargoPackageMarker(StringField):
+    alias = "_package_tag"
+    help = "Marker for a top level package"
+
+
 class CargoPackageSourcesField(MultipleSourcesField):
     default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*.rs", "examples/**/*")
     expected_file_extensions = (".rs", ".toml", ".lock")
@@ -77,12 +82,14 @@ class CargoPackageTarget(TargetGenerator):
         OutputPathField,
         EnvironmentField,
         CargoPackageSourcesField,
+        _CargoPackageMarker,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
+        _CargoPackageMarker,
     )
     moved_fields = (CargoPackageDependenciesField,)
     help = help_text(
@@ -116,6 +123,7 @@ class CargoPackageTargetImpl(Target):
         OutputPathField,
         EnvironmentField,
         CargoPackageNameField,
+        _CargoPackageMarker,
     )
     help = help_text(
         """
