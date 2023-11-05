@@ -15,6 +15,7 @@ from pants.engine.target import (
 )
 
 from pants_cargo_porcelain.target_types import CargoLibraryNameField, CargoPackageSourcesField
+from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets
 
 
 @dataclass(frozen=True)
@@ -29,7 +30,10 @@ class InferCargoDependencies(InferDependenciesRequest):
 
 
 @rule
-async def infer_cargo_dependencies(request: InferCargoDependencies) -> InferredDependencies:
+async def infer_cargo_dependencies(
+    request: InferCargoDependencies,
+    all_targets: AllCargoTargets,
+) -> InferredDependencies:
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
     cargo_toml_path = f"{request.field_set.address.spec_path}/Cargo.toml"
 

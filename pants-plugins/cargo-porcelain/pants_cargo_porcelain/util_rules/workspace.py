@@ -85,7 +85,9 @@ class CargoPackageMapping:
 
 
 @rule(desc="Assign packages to workspaces")
-async def assign_packages_to_workspaces(all_cargo_targets: AllCargoTargets) -> CargoPackageMapping:
+async def assign_packages_to_workspaces(
+    all_cargo_targets: AllCargoTargets,
+) -> CargoPackageMapping:
     workspace_cargo_toml = await MultiGet(
         Get(CargoToml, CargoTomlRequest(workspace[CargoWorkspaceSourcesField]))
         for workspace in all_cargo_targets.workspaces
