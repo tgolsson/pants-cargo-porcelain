@@ -1,3 +1,4 @@
+import os
 import pathlib
 from dataclasses import dataclass
 
@@ -15,7 +16,7 @@ from pants.engine.target import (
 )
 
 from pants_cargo_porcelain.target_types import CargoLibraryNameField, CargoPackageSourcesField
-from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets
+from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,7 @@ class InferCargoDependencies(InferDependenciesRequest):
 async def infer_cargo_dependencies(
     request: InferCargoDependencies,
     all_targets: AllCargoTargets,
+    package_mapping: CargoPackageMapping,
 ) -> InferredDependencies:
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
     cargo_toml_path = f"{request.field_set.address.spec_path}/Cargo.toml"
@@ -45,6 +47,10 @@ async def infer_cargo_dependencies(
     base_path = pathlib.Path(cargo_toml_path).parent
 
     all_dependencies = []
+
+    if package_mapping.is_workspace_member(request.field_set):
+        all_dependencies.append(package_mapping.get_workspace_for_package(request.field_set))
+
     for file_content in digest_contents:
         content = toml.loads(file_content.content.decode())
         dependencies = content.get("dependencies", {})
@@ -55,7 +61,8 @@ async def infer_cargo_dependencies(
 
             path = dependency["path"]
 
-            dependency_directory = base_path / path
+            dependency_directory = os.path.normpath(base_path / path)
+
             candidate_targets = await Get(
                 Targets,
                 RawSpecs(

@@ -87,6 +87,7 @@ async def generate_cargo_generated_target(
             tests.append(target)
 
     name = request.generator.address.create_generated("package")
+    root_package = str(name)
     generated_targets = [
         CargoPackageTargetImpl(
             {
@@ -103,6 +104,7 @@ async def generate_cargo_generated_target(
             CargoLibraryTarget(
                 {
                     CargoLibraryNameField.alias: target["name"],
+                    CargoPackageDependenciesField.alias: [root_package],
                     **request.template,
                 },
                 name,
@@ -115,7 +117,7 @@ async def generate_cargo_generated_target(
         generated_targets.append(
             CargoBinaryTarget(
                 {
-                    CargoPackageDependenciesField.alias: generated_lib_names,
+                    CargoPackageDependenciesField.alias: [*generated_lib_names, root_package],
                     CargoBinaryNameField.alias: target["name"],
                     **request.template,
                 },
@@ -129,7 +131,7 @@ async def generate_cargo_generated_target(
             CargoTestTarget(
                 {
                     **request.template,
-                    CargoPackageDependenciesField.alias: generated_lib_names,
+                    CargoPackageDependenciesField.alias: [*generated_lib_names, root_package],
                     CargoTestNameField.alias: target["name"],
                     CargoPackageSourcesField.alias: [
                         *CargoPackageSourcesField.default,

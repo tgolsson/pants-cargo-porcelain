@@ -12,6 +12,7 @@ from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,9 @@ async def build_cargo_binary(
     source_files, toolchain = await MultiGet(
         Get(
             SourceFiles,
-            SourceFilesRequest([req.sources]),
+            CargoSourcesRequest(
+                frozenset([req.address]),
+            ),
         ),
         Get(
             RustToolchain,

@@ -83,6 +83,19 @@ class CargoPackageMapping:
     workspace_to_packages: FrozenDict[Address, tuple[CargoWorkspaceMember, ...]]
     loose_packages: frozenset[CargoPackageTargetImpl]
 
+    def is_workspace_member(self, target: Target) -> bool:
+        return any(
+            target.address in [m.target.address for m in members]
+            for members in self.workspace_to_packages.values()
+        )
+
+    def get_workspace_for_package(self, target: Target) -> CargoWorkspaceTarget:
+        for workspace, members in self.workspace_to_packages.items():
+            if target.address in [m.target.address for m in members]:
+                return workspace
+
+        raise ValueError(f"target {target.address} is not a workspace member")
+
 
 @rule(desc="Assign packages to workspaces")
 async def assign_packages_to_workspaces(

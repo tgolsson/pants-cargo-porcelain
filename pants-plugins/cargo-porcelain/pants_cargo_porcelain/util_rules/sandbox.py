@@ -5,7 +5,7 @@ from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
 from pants.engine.target import TransitiveTargets, TransitiveTargetsRequest
 
-from pants_cargo_porcelain.target_types import CargoPackageSourcesField
+from pants_cargo_porcelain.target_types import CargoPackageSourcesField, CargoWorkspaceSourcesField
 
 
 @dataclass(frozen=True)
@@ -16,14 +16,23 @@ class CargoSourcesRequest:
 @rule
 async def cargo_sources(request: CargoSourcesRequest) -> SourceFiles:
     transitive_targets = await Get(TransitiveTargets, TransitiveTargetsRequest(request.addresses))
+    source_fields = []
+
+    for tgt in transitive_targets.closure:
+        if tgt.has_field(CargoPackageSourcesField):
+            source_fields.append(tgt[CargoPackageSourcesField])
+        elif tgt.has_field(CargoWorkspaceSourcesField):
+            source_fields.append(tgt[CargoWorkspaceSourcesField])
 
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest([
-            tgt[CargoPackageSourcesField]
-            for tgt in transitive_targets.closure
-            if tgt.has_field(CargoPackageSourcesField)
-        ]),
+        SourceFilesRequest(
+            [
+                tgt[CargoPackageSourcesField]
+                for tgt in transitive_targets.closure
+                if tgt.has_field(CargoPackageSourcesField)
+            ]
+        ),
     )
 
     return source_files
