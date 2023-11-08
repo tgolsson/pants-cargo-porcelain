@@ -18,7 +18,6 @@ from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
-from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
 
 @dataclass(frozen=True)
@@ -32,7 +31,6 @@ async def find_putative_targets(
     all_owned_sources: AllOwnedSources,
     rust: RustSubsystem,
     rustup: RustupTool,
-    package_mapping: CargoPackageMapping,
 ) -> PutativeTargets:
     if not rust.tailor:
         return PutativeTargets()

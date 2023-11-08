@@ -15,7 +15,12 @@ from pants.engine.target import (
     Targets,
 )
 
-from pants_cargo_porcelain.target_types import CargoLibraryNameField, CargoPackageSourcesField
+from pants_cargo_porcelain.target_types import (
+    CargoBinaryNameField,
+    CargoLibraryNameField,
+    CargoPackageNameField,
+    CargoPackageSourcesField,
+)
 from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
 
@@ -24,6 +29,9 @@ class CargoDependenciesInferenceFieldSet(FieldSet):
     required_fields = (CargoPackageSourcesField,)
 
     sources: CargoPackageSourcesField
+
+    library_name: CargoLibraryNameField
+    binary_name: CargoBinaryNameField
 
 
 class InferCargoDependencies(InferDependenciesRequest):
@@ -36,6 +44,9 @@ async def infer_cargo_dependencies(
     all_targets: AllCargoTargets,
     package_mapping: CargoPackageMapping,
 ) -> InferredDependencies:
+    if request.field_set.library_name.value is None and request.field_set.binary_name.value is None:
+        return InferredDependencies([])
+
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
     cargo_toml_path = f"{request.field_set.address.spec_path}/Cargo.toml"
 
@@ -50,6 +61,8 @@ async def infer_cargo_dependencies(
 
     if package_mapping.is_workspace_member(request.field_set):
         all_dependencies.append(package_mapping.get_workspace_for_package(request.field_set))
+
+        all_dependencies.extend(package_mapping.get_workspace_members(request.field_set))
 
     for file_content in digest_contents:
         content = toml.loads(file_content.content.decode())
@@ -70,6 +83,7 @@ async def infer_cargo_dependencies(
                     description_of_origin="the `openapi_document` dependency inference",
                 ),
             )
+
             addresses = [
                 target.address
                 for target in candidate_targets
@@ -77,6 +91,9 @@ async def infer_cargo_dependencies(
             ]
 
             all_dependencies.extend(addresses)
+
+    if request.field_set.address in all_dependencies:
+        all_dependencies.remove(request.field_set.address)
 
     return InferredDependencies(sorted(all_dependencies))
 

@@ -96,6 +96,13 @@ class CargoPackageMapping:
 
         raise ValueError(f"target {target.address} is not a workspace member")
 
+    def get_workspace_members(self, target: Target) -> tuple[CargoPackageTargetImpl, ...]:
+        for workspace, members in self.workspace_to_packages.items():
+            if target.address in [m.target.address for m in members]:
+                return tuple([m.target.address for m in members])
+
+        raise ValueError(f"target {target.address} is not a workspace member")
+
 
 @rule(desc="Assign packages to workspaces")
 async def assign_packages_to_workspaces(

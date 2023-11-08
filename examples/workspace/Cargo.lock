@@ -3,6 +3,10 @@
 version = 3
 
 [[package]]
+name = "secondlib"
+version = "0.1.0"
+
+[[package]]
 name = "wsbin"
 version = "0.1.0"
 dependencies = [
@@ -12,3 +16,6 @@ dependencies = [
 [[package]]
 name = "wslib"
 version = "0.1.0"
+dependencies = [
+ "secondlib",
+]

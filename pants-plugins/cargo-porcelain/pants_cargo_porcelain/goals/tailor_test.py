@@ -14,7 +14,7 @@ from pants_cargo_porcelain import subsystems, target_types
 from pants_cargo_porcelain.goals.tailor import PutativeCargoTargetsRequest
 from pants_cargo_porcelain.goals.tailor import rules as cargo_tailor_rules
 from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
-from pants_cargo_porcelain.util_rules import cargo, rustup
+from pants_cargo_porcelain.util_rules import cargo, rustup, workspace
 
 
 @pytest.fixture
@@ -29,6 +29,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *cargo.rules(),
             *rustup.rules(),
+            *workspace.rules(),
             QueryRule(PutativeTargets, [PutativeCargoTargetsRequest, AllOwnedSources]),
         ],
         target_types=[CargoPackageTarget],
