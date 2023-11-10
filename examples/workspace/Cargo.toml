@@ -1,7 +1,3 @@
 [workspace]
 resolver = "2"
-members = [
-   "wslib",
-   "wsbin",
-   "secondlib",
-]
+members = ["wslib", "wsbin", "secondlib"]

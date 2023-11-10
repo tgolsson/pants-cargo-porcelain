@@ -7,6 +7,8 @@ from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, UnionRule, collect_rules, rule
 from pants.engine.target import (
+    CoarsenedTargets,
+    CoarsenedTargetsRequest,
     FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
@@ -20,18 +22,16 @@ from pants_cargo_porcelain.target_types import (
     CargoLibraryNameField,
     CargoPackageNameField,
     CargoPackageSourcesField,
+    CargoWorkspaceSourcesField,
 )
 from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
 
 @dataclass(frozen=True)
 class CargoDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (CargoPackageSourcesField,)
+    required_fields = (CargoPackageSourcesField, CargoPackageNameField)
 
     sources: CargoPackageSourcesField
-
-    library_name: CargoLibraryNameField
-    binary_name: CargoBinaryNameField
 
 
 class InferCargoDependencies(InferDependenciesRequest):
@@ -44,9 +44,6 @@ async def infer_cargo_dependencies(
     all_targets: AllCargoTargets,
     package_mapping: CargoPackageMapping,
 ) -> InferredDependencies:
-    if request.field_set.library_name.value is None and request.field_set.binary_name.value is None:
-        return InferredDependencies([])
-
     hydrated_sources = await Get(HydratedSources, HydrateSourcesRequest(request.field_set.sources))
     cargo_toml_path = f"{request.field_set.address.spec_path}/Cargo.toml"
 
@@ -60,9 +57,9 @@ async def infer_cargo_dependencies(
     all_dependencies = []
 
     if package_mapping.is_workspace_member(request.field_set):
-        all_dependencies.append(package_mapping.get_workspace_for_package(request.field_set))
-
-        all_dependencies.extend(package_mapping.get_workspace_members(request.field_set))
+        ws = package_mapping.get_workspace_for_package(request.field_set)
+        #        workspace_package_addresses = package_mapping.get_workspace_members(ws)
+        all_dependencies.extend([ws])
 
     for file_content in digest_contents:
         content = toml.loads(file_content.content.decode())
@@ -80,7 +77,7 @@ async def infer_cargo_dependencies(
                 Targets,
                 RawSpecs(
                     dir_globs=(DirGlobSpec(f"{dependency_directory}"),),
-                    description_of_origin="the `openapi_document` dependency inference",
+                    description_of_origin="the `cargo` dependency inference",
                 ),
             )
 
@@ -98,8 +95,30 @@ async def infer_cargo_dependencies(
     return InferredDependencies(sorted(all_dependencies))
 
 
+@dataclass(frozen=True)
+class CargoWorkspaceDependenciesInferenceFieldSet(FieldSet):
+    required_fields = (CargoWorkspaceSourcesField,)
+
+    sources: CargoWorkspaceSourcesField
+
+
+class InferWorkspaceDependencies(InferDependenciesRequest):
+    infer_from = CargoWorkspaceDependenciesInferenceFieldSet
+
+
+@rule
+async def infer_workspace_dependencies(
+    request: InferWorkspaceDependencies,
+    package_mapping: CargoPackageMapping,
+) -> InferredDependencies:
+    workspace_package_addresses = package_mapping.get_workspace_members(request.field_set.address)
+
+    return InferredDependencies(workspace_package_addresses)
+
+
 def rules():
     return [
         *collect_rules(),
         UnionRule(InferDependenciesRequest, InferCargoDependencies),
+        UnionRule(InferDependenciesRequest, InferWorkspaceDependencies),
     ]

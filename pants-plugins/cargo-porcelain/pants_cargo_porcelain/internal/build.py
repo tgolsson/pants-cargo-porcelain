@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest
 from pants.engine.internals.selectors import Get, MultiGet

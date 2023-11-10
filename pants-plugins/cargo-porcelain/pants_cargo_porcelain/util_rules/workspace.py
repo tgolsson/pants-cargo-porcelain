@@ -5,14 +5,12 @@ import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Paths
+from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets, UnexpandedTargets
+from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets
 from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
-    CargoPackageNameField,
-    CargoPackageSourcesField,
     CargoPackageTargetImpl,
     CargoWorkspaceSourcesField,
     CargoWorkspaceTarget,
@@ -98,10 +96,10 @@ class CargoPackageMapping:
 
     def get_workspace_members(self, target: Target) -> tuple[CargoPackageTargetImpl, ...]:
         for workspace, members in self.workspace_to_packages.items():
-            if target.address in [m.target.address for m in members]:
+            if target == workspace:
                 return tuple([m.target.address for m in members])
 
-        raise ValueError(f"target {target.address} is not a workspace member")
+        raise ValueError(f"target {target.address} is not a workspace")
 
 
 @rule(desc="Assign packages to workspaces")
@@ -143,6 +141,7 @@ async def assign_packages_to_workspaces(
                     f"found two package targets in directory '{ws.address.spec_path}/{member}':"
                     f" {addresses}"
                 )
+
             packages -= set(filtered_targets)
 
             workspace_members.append(
@@ -153,6 +152,8 @@ async def assign_packages_to_workspaces(
             )
 
         workspace_to_packages[ws.address] = frozenset(workspace_members)
+
+        print(f"workspace {ws.address} has members {workspace_members}")
 
     return CargoPackageMapping(
         workspace_to_packages=FrozenDict(workspace_to_packages), loose_packages=frozenset(packages)
