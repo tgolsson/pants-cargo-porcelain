@@ -9,6 +9,8 @@ from pants.engine.target import (
     Dependencies,
     DependenciesRequest,
     Targets,
+    TransitiveTargets,
+    TransitiveTargetsRequest,
 )
 
 from pants_cargo_porcelain.target_types import CargoPackageSourcesField, CargoWorkspaceSourcesField
@@ -22,24 +24,21 @@ class CargoSourcesRequest:
 @rule
 async def cargo_sources(request: CargoSourcesRequest) -> SourceFiles:
     print(request)
-    targets = await Get(Targets, Addresses(request.addresses))
-    target = targets[0]
-    direct_dependencies = await Get(Targets, DependenciesRequest(target.get(Dependencies)))
+
     coarsened_targets = await Get(
-        CoarsenedTargets,
-        CoarsenedTargetsRequest([d.address for d in direct_dependencies]),
+        TransitiveTargets,
+        TransitiveTargetsRequest(request.addresses),
     )
 
     source_fields = []
 
-    for tgt in coarsened_targets.closure():
+    for tgt in coarsened_targets.closure:
         if tgt.has_field(CargoPackageSourcesField):
             source_fields.append(tgt[CargoPackageSourcesField])
         elif tgt.has_field(CargoWorkspaceSourcesField):
             source_fields.append(tgt[CargoWorkspaceSourcesField])
 
-    source_fields.append(target[CargoPackageSourcesField])
-
+    print(source_fields)
     source_files = await Get(
         SourceFiles,
         SourceFilesRequest(
@@ -50,6 +49,8 @@ async def cargo_sources(request: CargoSourcesRequest) -> SourceFiles:
             ]
         ),
     )
+
+    print(source_files)
 
     return source_files
 

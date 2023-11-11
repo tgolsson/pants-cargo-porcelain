@@ -43,6 +43,11 @@ class _CargoPackageMarker(StringField):
     help = "Marker for a top level package"
 
 
+class _CargoSourcesMarker(StringField):
+    alias = "_sources_tag"
+    help = "Marker for a Rust source bundle with Cargo files"
+
+
 class CargoPackageSourcesField(MultipleSourcesField):
     default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*.rs", "examples/**/*")
     expected_file_extensions = (".rs", ".toml", ".lock")
@@ -92,8 +97,10 @@ class CargoPackageTarget(TargetGenerator):
         _CargoPackageMarker,
     )
     moved_fields = (CargoPackageDependenciesField,)
-    help = help_text("""
-        """)
+    help = help_text(
+        """
+        """
+    )
 
 
 class CargoBinaryNameField(StringField):
@@ -116,16 +123,36 @@ class CargoPackageTargetImpl(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoPackageNameField,
         _CargoPackageMarker,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
+
+
+class CargoSourcesTarget(Target):
+    alias = "cargo_sources"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CargoPackageDependenciesField,
+        CargoPackageSourcesField,
+        SkipCargoTestsField,
+        OutputPathField,
+        EnvironmentField,
+        CargoPackageNameField,
+        _CargoSourcesMarker,
+    )
+    help = help_text(
+        """
+
+        """
+    )
 
 
 class CargoBinaryTarget(Target):
@@ -133,15 +160,16 @@ class CargoBinaryTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoBinaryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoTestTarget(Target):
@@ -149,15 +177,17 @@ class CargoTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoTestNameField,
+        CargoPackageSourcesField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 class CargoLibraryTarget(Target):
@@ -165,15 +195,16 @@ class CargoLibraryTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoLibraryNameField,
     )
-    help = help_text("""
+    help = help_text(
+        """
 
-        """)
+        """
+    )
 
 
 def rules():
