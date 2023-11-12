@@ -35,16 +35,10 @@ class RustupTool(ExternalTool):
 
     default_version = "v1.26.0"
     default_known_versions = [
-        (
-            "v1.26.0|linux_arm64"
-            " |1b7b4411c9723dbbdda4ae9dde23a33d8ab093b54c97d3323784b117d3e9413f|32542312"
-        ),
+        "v1.26.0|linux_arm64|673e336c81c65e6b16dcdede33f4cc9ed0f08bde1dbe7a935f113605292dc800|14131368",
         "v1.26.0|linux_x86_64|0b2f6c8f85a3d02fde2efc0ced4657869d73fccfce59defb4e8d29233116e6db|14293176",
-        (
-            "v1.26.0|macos_arm64"
-            " |27c88183de036ebd4ffa5bc5211329666e3c40ac69c5d938bcdab9b9ec248fd4|30189956"
-        ),
-        "v1.26.0|macos_x86_64|6e00cf4661c081fb1d010ce60904dccb880788a52bf10de16a40f32082415a87|29390800",
+        "v1.26.0|macos_arm64|ed299a8fe762dc28161a99a03cf62836977524ad557ad70e13882d2f375d3983|8000713",
+        "v1.26.0|macos_x86_64|f6d1a9fac1a0d0802d87c254f02369a79973bc8c55aa0016d34af4fcdbd67822|8670640",
     ]
 
     def generate_url(self, plat: Platform) -> str:

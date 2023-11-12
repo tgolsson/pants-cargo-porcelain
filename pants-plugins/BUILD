@@ -17,7 +17,7 @@ python_requirement(
 )
 
 name_to_constraint = {
-    "pants-current": "==2.18.0rc3",  # TBD[TSolberg]: Developing against 2.18 until 2.18.0 is released.
+    "pants-current": ">2.18.0a0,<2.19.0",
     "pants-next": "==2.19.0.dev0",
 }
 
