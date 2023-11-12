@@ -15,6 +15,7 @@ jobs:
       matrix:
         pants-version: ["2.18.0"]
         platform: ["macos-13", "ubuntu-latest"]
+        shard: [0, 1, 2]
 
     runs-on: "${{ matrix.platform }}"
 
@@ -38,7 +39,7 @@ jobs:
 
     - name: Test everything
       run: |
-        pants test ::
+        pants test --shared="${{ matrix.shared}}/3" ::
 
   package:
     runs-on: ubuntu-20.04
