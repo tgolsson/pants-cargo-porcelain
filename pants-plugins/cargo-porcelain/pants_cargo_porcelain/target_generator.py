@@ -22,8 +22,10 @@ from pants_cargo_porcelain.target_types import (
     CargoPackageSourcesField,
     CargoPackageTarget,
     CargoPackageTargetImpl,
+    CargoSourcesTarget,
     CargoTestNameField,
     CargoTestTarget,
+    _CargoSourcesMarker,
 )
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
@@ -86,16 +88,30 @@ async def generate_cargo_generated_target(
         if "test" in target["kind"]:
             tests.append(target)
 
-    name = request.generator.address.create_generated("package")
+    sources = request.generator.address.create_generated("sources")
+    sources_address = str(sources)
+
+    package = request.generator.address.create_generated("package")
+    package_address = str(package)
+
     generated_targets = [
+        CargoSourcesTarget(
+            {
+                **request.template,
+                _CargoSourcesMarker.alias: "yes",
+            },
+            sources,
+        ),
         CargoPackageTargetImpl(
             {
-                CargoPackageNameField.alias: output["packages"][0]["name"],
                 **request.template,
+                CargoPackageNameField.alias: output["packages"][0]["name"],
+                CargoPackageDependenciesField.alias: [sources_address],
             },
-            name,
-        )
+            package,
+        ),
     ]
+
     generated_lib_names = []
     for target in libraries:
         name = request.generator.address.create_generated("library")
@@ -103,6 +119,7 @@ async def generate_cargo_generated_target(
             CargoLibraryTarget(
                 {
                     CargoLibraryNameField.alias: target["name"],
+                    CargoPackageDependenciesField.alias: [package_address],
                     **request.template,
                 },
                 name,
@@ -115,7 +132,7 @@ async def generate_cargo_generated_target(
         generated_targets.append(
             CargoBinaryTarget(
                 {
-                    CargoPackageDependenciesField.alias: generated_lib_names,
+                    CargoPackageDependenciesField.alias: [package_address],
                     CargoBinaryNameField.alias: target["name"],
                     **request.template,
                 },
@@ -129,7 +146,7 @@ async def generate_cargo_generated_target(
             CargoTestTarget(
                 {
                     **request.template,
-                    CargoPackageDependenciesField.alias: generated_lib_names,
+                    CargoPackageDependenciesField.alias: [package_address],
                     CargoTestNameField.alias: target["name"],
                     CargoPackageSourcesField.alias: [
                         *CargoPackageSourcesField.default,

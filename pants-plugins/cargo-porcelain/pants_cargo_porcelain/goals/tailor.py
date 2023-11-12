@@ -17,7 +17,7 @@ from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
-from pants_cargo_porcelain.target_types import CargoPackageTarget
+from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
 
 
 @dataclass(frozen=True)
@@ -45,12 +45,23 @@ async def find_putative_targets(
     pts = []
 
     for dirname, filenames in group_by_dir(unowned_cargo_files).items():
-        if b"[package]" in unowned_cargo_contents[os.path.join(dirname, "Cargo.toml")]:
+        contents = unowned_cargo_contents[os.path.join(dirname, "Cargo.toml")]
+        if b"[package]" in contents:
             pts.append(
                 PutativeTarget.for_target_type(
                     CargoPackageTarget,
                     path=dirname,
                     name=None,
+                    triggering_sources=sorted(filenames),
+                )
+            )
+
+        if b"[workspace]" in contents:
+            pts.append(
+                PutativeTarget.for_target_type(
+                    CargoWorkspaceTarget,
+                    path=dirname,
+                    name="workspace",
                     triggering_sources=sorted(filenames),
                 )
             )

@@ -20,9 +20,32 @@ from pants.engine.target import (
 from pants.util.strutil import help_text
 
 
+class CargoWorkspaceSourcesField(MultipleSourcesField):
+    default = ("Cargo.toml", "Cargo.lock")
+    expected_file_extensions = (".toml", ".lock")
+    help = generate_multiple_sources_field_help_message(
+        "Example: `sources=['Cargo.toml', 'Cargo.lock']`"
+    )
+
+
+class CargoWorkspaceTarget(Target):
+    alias = "cargo_workspace"
+    core_fields = (*COMMON_TARGET_FIELDS, CargoWorkspaceSourcesField)
+
+
 class CargoPackageNameField(StringField):
     alias = "package_name"
     help = "The name of the package."
+
+
+class _CargoPackageMarker(StringField):
+    alias = "_package_tag"
+    help = "Marker for a top level package"
+
+
+class _CargoSourcesMarker(StringField):
+    alias = "_sources_tag"
+    help = "Marker for a Rust source bundle with Cargo files"
 
 
 class CargoPackageSourcesField(MultipleSourcesField):
@@ -64,12 +87,14 @@ class CargoPackageTarget(TargetGenerator):
         OutputPathField,
         EnvironmentField,
         CargoPackageSourcesField,
+        _CargoPackageMarker,
     )
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
+        _CargoPackageMarker,
     )
     moved_fields = (CargoPackageDependenciesField,)
     help = help_text("""
@@ -96,11 +121,28 @@ class CargoPackageTargetImpl(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
+        SkipCargoTestsField,
+        OutputPathField,
+        EnvironmentField,
+        CargoPackageNameField,
+        _CargoPackageMarker,
+    )
+    help = help_text("""
+
+        """)
+
+
+class CargoSourcesTarget(Target):
+    alias = "cargo_sources"
+    core_fields = (
+        *COMMON_TARGET_FIELDS,
+        CargoPackageDependenciesField,
         CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoPackageNameField,
+        _CargoSourcesMarker,
     )
     help = help_text("""
 
@@ -112,7 +154,6 @@ class CargoBinaryTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
@@ -128,11 +169,11 @@ class CargoTestTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
         CargoTestNameField,
+        CargoPackageSourcesField,
     )
     help = help_text("""
 
@@ -144,7 +185,6 @@ class CargoLibraryTarget(Target):
     core_fields = (
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
-        CargoPackageSourcesField,
         SkipCargoTestsField,
         OutputPathField,
         EnvironmentField,
@@ -167,4 +207,5 @@ def target_types():
         CargoPackageTargetImpl,
         CargoBinaryTarget,
         CargoLibraryTarget,
+        CargoWorkspaceTarget,
     ]

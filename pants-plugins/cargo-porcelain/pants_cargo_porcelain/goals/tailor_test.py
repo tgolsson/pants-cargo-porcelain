@@ -13,8 +13,8 @@ from pants.testutil.rule_runner import RuleRunner
 from pants_cargo_porcelain import subsystems, target_types
 from pants_cargo_porcelain.goals.tailor import PutativeCargoTargetsRequest
 from pants_cargo_porcelain.goals.tailor import rules as cargo_tailor_rules
-from pants_cargo_porcelain.target_types import CargoPackageTarget
-from pants_cargo_porcelain.util_rules import cargo, rustup
+from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
+from pants_cargo_porcelain.util_rules import cargo, rustup, workspace
 
 
 @pytest.fixture
@@ -29,6 +29,7 @@ def rule_runner() -> RuleRunner:
             *external_tool.rules(),
             *cargo.rules(),
             *rustup.rules(),
+            *workspace.rules(),
             QueryRule(PutativeTargets, [PutativeCargoTargetsRequest, AllOwnedSources]),
         ],
         target_types=[CargoPackageTarget],
@@ -56,15 +57,23 @@ def test_find_cargo_package_targets(rule_runner: RuleRunner) -> None:
     ])
 
 
-def test_ignore_workspace_targets(rule_runner: RuleRunner) -> None:
+def test_workspace_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
         "unowned/Cargo.toml": "[workspace]",
         "owned/Cargo.toml": '[package]\nname="foobar"\nversion = "0.1.0"',
         "owned/BUILD": "cargo_package()",
         "owned/src/lib.rs": "",
     })
+
     putative_targets = rule_runner.request(
         PutativeTargets,
         [PutativeCargoTargetsRequest(("unowned", "owned")), AllOwnedSources(["owned/Cargo.toml"])],
     )
-    assert putative_targets == PutativeTargets([])
+    assert putative_targets == PutativeTargets([
+        PutativeTarget.for_target_type(
+            CargoWorkspaceTarget,
+            path="unowned",
+            name="workspace",
+            triggering_sources=["Cargo.toml"],
+        )
+    ])
