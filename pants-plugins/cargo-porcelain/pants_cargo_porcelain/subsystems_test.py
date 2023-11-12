@@ -35,4 +35,4 @@ def test_platform_download_rustup(
     platform,
 ):
     rustup = rule_runner.request(RustupTool, [])
-    rustup_binary = rule_runner.request(DownloadedExternalTool, [rustup.get_request(platform)])
+    rule_runner.request(DownloadedExternalTool, [rustup.get_request(platform)])

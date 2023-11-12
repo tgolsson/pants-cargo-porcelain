@@ -32,13 +32,11 @@ def rule_runner():
 
 
 def test_clippy_subsystem_partition(rule_runner) -> None:
-    rule_runner.write_files(
-        {
-            "rust/BUILD": "cargo_package()",
-            "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-            "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
-        }
-    )
+    rule_runner.write_files({
+        "rust/BUILD": "cargo_package()",
+        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
+        "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
+    })
 
     tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
     res = rule_runner.request(
@@ -52,18 +50,16 @@ def test_clippy_subsystem_partition(rule_runner) -> None:
 def test_clippy_subsystem_run_ok(rule_runner) -> None:
     rule_runner.set_options(["--clippy-args=['--', '-Dwarnings']"], env_inherit={"PATH"})
 
-    rule_runner.write_files(
-        {
-            "rust/BUILD": "cargo_package()",
-            "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-            "rust/Cargo.lock": """version = 3
+    rule_runner.write_files({
+        "rust/BUILD": "cargo_package()",
+        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
+        "rust/Cargo.lock": """version = 3
 [[package]]
 name = "rust"
 version = "0.1.0"
 """,
-            "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
-        }
-    )
+        "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
+    })
 
     tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
     partitions = rule_runner.request(
@@ -87,18 +83,16 @@ version = "0.1.0"
 def test_clippy_subsystem_run_warn(rule_runner) -> None:
     rule_runner.set_options([], env_inherit={"PATH"})
 
-    rule_runner.write_files(
-        {
-            "rust/BUILD": "cargo_package()",
-            "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-            "rust/Cargo.lock": """version = 3
+    rule_runner.write_files({
+        "rust/BUILD": "cargo_package()",
+        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
+        "rust/Cargo.lock": """version = 3
 [[package]]
 name = "rust"
 version = "0.1.0"
 """,
-            "rust/src/main.rs": "fn main() { let a = 10; }",
-        }
-    )
+        "rust/src/main.rs": "fn main() { let a = 10; }",
+    })
 
     tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
     partitions = rule_runner.request(
@@ -123,18 +117,16 @@ version = "0.1.0"
 def test_clippy_subsystem_run_error(rule_runner) -> None:
     rule_runner.set_options(["--clippy-args=['--', '-Dwarnings']"], env_inherit={"PATH"})
 
-    rule_runner.write_files(
-        {
-            "rust/BUILD": "cargo_package()",
-            "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-            "rust/Cargo.lock": """version = 3
+    rule_runner.write_files({
+        "rust/BUILD": "cargo_package()",
+        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
+        "rust/Cargo.lock": """version = 3
 [[package]]
 name = "rust"
 version = "0.1.0"
 """,
-            "rust/src/main.rs": "fn main() { let a = 10; }",
-        }
-    )
+        "rust/src/main.rs": "fn main() { let a = 10; }",
+    })
 
     tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
     partitions = rule_runner.request(

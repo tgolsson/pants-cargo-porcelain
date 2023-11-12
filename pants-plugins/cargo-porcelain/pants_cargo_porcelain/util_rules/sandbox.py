@@ -19,13 +19,11 @@ async def cargo_sources(request: CargoSourcesRequest) -> SourceFiles:
 
     source_files = await Get(
         SourceFiles,
-        SourceFilesRequest(
-            [
-                tgt[CargoPackageSourcesField]
-                for tgt in transitive_targets.closure
-                if tgt.has_field(CargoPackageSourcesField)
-            ]
-        ),
+        SourceFilesRequest([
+            tgt[CargoPackageSourcesField]
+            for tgt in transitive_targets.closure
+            if tgt.has_field(CargoPackageSourcesField)
+        ]),
     )
 
     return source_files

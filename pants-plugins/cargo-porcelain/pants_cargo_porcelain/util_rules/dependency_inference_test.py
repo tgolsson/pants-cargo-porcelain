@@ -29,10 +29,9 @@ def rule_runner():
 
 
 def test_infer_dependency(rule_runner) -> None:
-    rule_runner.write_files(
-        {
-            "rust/BUILD": "cargo_package()",
-            "rust/Cargo.toml": """
+    rule_runner.write_files({
+        "rust/BUILD": "cargo_package()",
+        "rust/Cargo.toml": """
 [package]
 name = "test-with-path"
 version = "0.1.0"
@@ -41,18 +40,17 @@ edition = "2021"
 [dependencies]
 inner-path = { path = "./inner-path" }
 """,
-            "rust/src/lib.rs": "",
-            "rust/inner-path/BUILD": "cargo_package()",
-            "rust/inner-path/Cargo.toml": """
+        "rust/src/lib.rs": "",
+        "rust/inner-path/BUILD": "cargo_package()",
+        "rust/inner-path/Cargo.toml": """
 [package]
 name = "inner-path"
 version = "0.1.0"
 edition = "2021"
 """,
-            "rust/inner-path/Cargo.lock": "",
-            "rust/inner-path/src/lib.rs": "",
-        }
-    )
+        "rust/inner-path/Cargo.lock": "",
+        "rust/inner-path/src/lib.rs": "",
+    })
 
     tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="library"))
 
@@ -66,9 +64,7 @@ edition = "2021"
     )
 
     assert inferred_deps == InferredDependencies(
-        FrozenOrderedSet(
-            [
-                Address("rust/inner-path", generated_name="library"),
-            ]
-        ),
+        FrozenOrderedSet([
+            Address("rust/inner-path", generated_name="library"),
+        ]),
     )
