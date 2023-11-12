@@ -11,11 +11,13 @@ permissions:
 
 jobs:
   test:
-    runs-on: ubuntu-20.04
-
     strategy:
       matrix:
         pants-version: ["2.18.0"]
+        platform: ["macos-13", "ubuntu-latest"]
+        shard: [0, 1, 2]
+
+    runs-on: "${{ matrix.platform }}"
 
     steps:
     - uses: actions/checkout@v3
@@ -32,20 +34,19 @@ jobs:
       uses: pantsbuild/actions/init-pants@main
       with:
         # cache0 makes it easy to bust the cache if needed
-        gha-cache-key: cache1-test-py3.9-pants${{ matrix.pants-version }}
+        gha-cache-key: cache1-test-py3.9-pants${{ matrix.pants-version }}-${{ matrix.platform }}-${{ matrix.shard }}
         named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
 
     - name: Test everything
       run: |
-        ./.github/get-pants.sh
-        /home/runner/bin/pants test ::
+        pants test --shard="${{ matrix.shard }}/3" ::
 
   package:
     runs-on: ubuntu-20.04
 
     strategy:
       matrix:
-        pants-version: ["2.18.0rc3"]
+        pants-version: ["2.18.0"]
 
     steps:
     - uses: actions/checkout@v3
