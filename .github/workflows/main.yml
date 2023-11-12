@@ -38,8 +38,7 @@ jobs:
 
     - name: Test everything
       run: |
-        ./.github/get-pants.sh
-        /home/runner/bin/pants test ::
+        pants test ::
 
   package:
     runs-on: ubuntu-20.04
