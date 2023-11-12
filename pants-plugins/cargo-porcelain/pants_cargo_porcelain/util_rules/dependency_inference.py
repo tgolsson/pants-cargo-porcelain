@@ -7,8 +7,6 @@ from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.engine.fs import Digest, DigestContents, DigestSubset, PathGlobs
 from pants.engine.rules import Get, UnionRule, collect_rules, rule
 from pants.engine.target import (
-    CoarsenedTargets,
-    CoarsenedTargetsRequest,
     FieldSet,
     HydratedSources,
     HydrateSourcesRequest,
@@ -18,18 +16,18 @@ from pants.engine.target import (
 )
 
 from pants_cargo_porcelain.target_types import (
-    CargoBinaryNameField,
     CargoLibraryNameField,
     CargoPackageNameField,
     CargoPackageSourcesField,
     CargoWorkspaceSourcesField,
+    _CargoPackageMarker,
 )
 from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
 
 @dataclass(frozen=True)
 class CargoDependenciesInferenceFieldSet(FieldSet):
-    required_fields = (CargoPackageSourcesField, CargoPackageNameField)
+    required_fields = (CargoPackageNameField, _CargoPackageMarker)
 
     sources: CargoPackageSourcesField
 
@@ -58,8 +56,7 @@ async def infer_cargo_dependencies(
 
     if package_mapping.is_workspace_member(request.field_set):
         ws = package_mapping.get_workspace_for_package(request.field_set)
-        #        workspace_package_addresses = package_mapping.get_workspace_members(ws)
-        all_dependencies.extend([ws])
+        all_dependencies.append(ws)
 
     for file_content in digest_contents:
         content = toml.loads(file_content.content.decode())
@@ -111,9 +108,9 @@ async def infer_workspace_dependencies(
     request: InferWorkspaceDependencies,
     package_mapping: CargoPackageMapping,
 ) -> InferredDependencies:
-    workspace_package_addresses = package_mapping.get_workspace_members(request.field_set.address)
+    workspace_packages = package_mapping.get_workspace_members(request.field_set.address)
 
-    return InferredDependencies(workspace_package_addresses)
+    return InferredDependencies(tuple(wp.sources.address for wp in workspace_packages))
 
 
 def rules():

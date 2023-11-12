@@ -12,9 +12,11 @@ from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
     CargoPackageTargetImpl,
+    CargoSourcesTarget,
     CargoWorkspaceSourcesField,
     CargoWorkspaceTarget,
     _CargoPackageMarker,
+    _CargoSourcesMarker,
 )
 
 logger = logging.getLogger(__name__)
@@ -73,7 +75,8 @@ async def load_cargo_toml(request: CargoTomlRequest) -> CargoToml:
 @dataclass(frozen=True)
 class CargoWorkspaceMember:
     member_path: str
-    target: CargoPackageTargetImpl
+    package: CargoPackageTargetImpl
+    sources: CargoSourcesTarget
 
 
 @dataclass(frozen=True)
@@ -82,22 +85,24 @@ class CargoPackageMapping:
     loose_packages: frozenset[CargoPackageTargetImpl]
 
     def is_workspace_member(self, target: Target) -> bool:
-        return any(
-            target.address in [m.target.address for m in members]
-            for members in self.workspace_to_packages.values()
-        )
+        try:
+            self.get_workspace_for_package(target)
+            return True
+        except ValueError:
+            return False
 
     def get_workspace_for_package(self, target: Target) -> CargoWorkspaceTarget:
         for workspace, members in self.workspace_to_packages.items():
-            if target.address in [m.target.address for m in members]:
-                return workspace
+            for m in members:
+                if target.address == m.package.address or target.address == m.sources.address:
+                    return workspace
 
         raise ValueError(f"target {target.address} is not a workspace member")
 
     def get_workspace_members(self, target: Target) -> tuple[CargoPackageTargetImpl, ...]:
         for workspace, members in self.workspace_to_packages.items():
             if target == workspace:
-                return tuple([m.target.address for m in members])
+                return tuple(members)
 
         raise ValueError(f"target {target.address} is not a workspace")
 
@@ -135,6 +140,10 @@ async def assign_packages_to_workspaces(
                 target for target in member_targets if target.has_field(_CargoPackageMarker)
             ]
 
+            filtered_sources_targets = [
+                target for target in member_targets if target.has_field(_CargoSourcesMarker)
+            ]
+
             if len(filtered_targets) > 1:
                 addresses = [t.address for t in filtered_targets]
                 raise ValueError(
@@ -147,13 +156,12 @@ async def assign_packages_to_workspaces(
             workspace_members.append(
                 CargoWorkspaceMember(
                     member_path=member,
-                    target=filtered_targets[0],
+                    package=filtered_targets[0],
+                    sources=filtered_sources_targets[0],
                 )
             )
 
         workspace_to_packages[ws.address] = frozenset(workspace_members)
-
-        print(f"workspace {ws.address} has members {workspace_members}")
 
     return CargoPackageMapping(
         workspace_to_packages=FrozenDict(workspace_to_packages), loose_packages=frozenset(packages)
