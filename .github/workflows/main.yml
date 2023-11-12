@@ -39,7 +39,7 @@ jobs:
 
     - name: Test everything
       run: |
-        pants test --shared="${{ matrix.shared}}/3" ::
+        pants test --shard="${{ matrix.shard }}/3" ::
 
   package:
     runs-on: ubuntu-20.04
