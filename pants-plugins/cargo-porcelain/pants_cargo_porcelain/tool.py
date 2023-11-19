@@ -1,9 +1,21 @@
+from __future__ import annotations
 
-from pants.option.subsystem import Subsystem
+from dataclasses import dataclass
+
+from pants.engine.process import ProcessResult
+from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption, StrOption
+from pants.option.subsystem import Subsystem
+from pants.util.strutil import softwrap
 
-class RustToolBase(Subsystem):
-    '''Base class for a Rust based tool that can be installed from source.'''
+from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
+from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+
+
+class RustTool(Subsystem):
+    """Base class for a Rust based tool that can be installed from source."""
+
+    project_name: str
 
     version = StrOption(
         advanced=True,
@@ -15,4 +27,70 @@ class RustToolBase(Subsystem):
         ),
     )
 
-class
+    def as_tool_request(self, *, version: str | None = None) -> RustToolRequest:
+        """Returns a `RustToolRequest` for this tool."""
+        return RustToolRequest(
+            tool_name=self.project_name,
+            version=version or self.version,
+        )
+
+
+@dataclass(frozen=True)
+class RustToolRequest:
+    """A request to install a Rust tool."""
+
+    tool_name: str
+    version: str
+
+
+@dataclass(frozen=True)
+class InstalledRustTool:
+    """The result of installing a Rust tool."""
+
+    exe: str
+    digest: Digest
+
+
+@rule
+async def get_rust_tool(request: RustToolRequest) -> InstalledRustTool:
+    toolchain = await Get(
+        RustToolchain,
+        RustToolchainRequest(
+            rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
+        ),
+    )
+
+    process_result = await Get(
+        ProcessResult,
+        CargoProcessRequest(
+            toolchain,
+            (
+                "install",
+                f"{request.tool_name}=={request.version}",
+                "--root={chroot}",
+            ),
+            output_files={request.tool_name},
+        ),
+    )
+
+    return InstalledRustTool(
+        exe={request.tool_name},
+        digest=process_result.output_digest,
+    )
+
+
+class Machete(RustTool):
+    """Machete is a tool for managing Rust projects with multiple binaries and libraries."""
+
+    options_scope = "machete"
+    help = "Tets"
+
+    project_name = "cargo-machete"
+    default_version = "0.6.0"
+
+
+def rules():
+    return [
+        *Machete.rules(),
+        *collect_rules(),
+    ]
