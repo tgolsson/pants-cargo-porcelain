@@ -2,12 +2,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
 from pants.option.option_types import StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
+from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.subsystems import RustupTool
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 
@@ -52,7 +55,9 @@ class InstalledRustTool:
 
 
 @rule
-async def get_rust_tool(request: RustToolRequest) -> InstalledRustTool:
+async def get_rust_tool(
+    request: RustToolRequest, rustup: RustupTool, platform: Platform
+) -> InstalledRustTool:
     toolchain = await Get(
         RustToolchain,
         RustToolchainRequest(
@@ -66,10 +71,11 @@ async def get_rust_tool(request: RustToolRequest) -> InstalledRustTool:
             toolchain,
             (
                 "install",
-                f"{request.tool_name}=={request.version}",
+                f"{request.tool_name}",
+                f"--version={request.version}",
                 "--root={chroot}",
             ),
-            output_files={request.tool_name},
+            output_files=(request.tool_name,),
         ),
     )
 
@@ -79,11 +85,11 @@ async def get_rust_tool(request: RustToolRequest) -> InstalledRustTool:
     )
 
 
-class Machete(RustTool):
-    """Machete is a tool for managing Rust projects with multiple binaries and libraries."""
+class Sccache(RustTool):
+    """Sccache helps with."""
 
-    options_scope = "machete"
-    help = "Tets"
+    options_scope = "sccache"
+    help = ""
 
     project_name = "cargo-machete"
     default_version = "0.6.0"
@@ -91,6 +97,6 @@ class Machete(RustTool):
 
 def rules():
     return [
-        *Machete.rules(),
+        *Sccache.rules(),
         *collect_rules(),
     ]
