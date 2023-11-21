@@ -1,6 +1,6 @@
 from . import subsystems, target_generator
 from . import target_types as tt
-from .goals import fmt, package, run, tailor, test
+from .goals import fmt, generate_lockfiles, package, run, tailor, test
 from .internal import build
 from .util_rules import cargo, dependency_inference, rustup, sandbox, workspace
 
@@ -22,6 +22,7 @@ def rules():
         *sandbox.rules(),
         *target_generator.rules(),
         *workspace.rules(),
+        *generate_lockfiles.rules(),
     ]
 
 

@@ -5,7 +5,7 @@ import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
+from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets
 from pants.util.frozendict import FrozenDict
@@ -56,17 +56,19 @@ class CargoTomlRequest:
     sources: MultipleSourcesField
 
 
+from pants.option.global_options import UnmatchedBuildFileGlobs
+
+
 @rule(desc="Load Cargo.toml for Cargo target")
 async def load_cargo_toml(request: CargoTomlRequest) -> CargoToml:
-    files = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [request.sources],
-        ),
+    snapshot = await Get(
+        Snapshot,
+        PathGlobs,
+        request.sources.path_globs(UnmatchedBuildFileGlobs.error()),
     )
 
     digest_contents = await Get(
-        DigestContents, DigestSubset(files.snapshot.digest, PathGlobs(["**/Cargo.toml"]))
+        DigestContents, DigestSubset(snapshot.digest, PathGlobs(["**/Cargo.toml"]))
     )
 
     return CargoToml(digest_contents[0].content)
