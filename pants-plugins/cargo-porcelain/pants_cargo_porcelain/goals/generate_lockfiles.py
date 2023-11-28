@@ -11,16 +11,23 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
+from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.engine.internals.selectors import Get, MultiGet
+from pants.engine.platform import Platform
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
 from pants.util.logging import LogLevel
 
+from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import (
     CargoPackageSourcesField,
     CargoPackageTarget,
     CargoWorkspaceTarget,
 )
+from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 from pants_cargo_porcelain.util_rules.workspace import (
     AllCargoTargets,
     CargoPackageMapping,
@@ -74,11 +81,11 @@ async def determine_rust_user_resolves(
 @dataclass(frozen=True)
 class GenerateCargoWorkspaceLockfileRequest:
     workspace: CargoWorkspaceTarget
-    packages: tuple[CargoPackageTarget, ...]
 
 
+@dataclass(frozen=True)
 class GenerateCargoPackageLockfileRequest:
-    pass
+    package: CargoPackageTarget
 
 
 @rule
@@ -91,8 +98,20 @@ async def generate_rust_workspace_lockfile(
 @rule
 async def generate_rust_package_lockfile(
     req: GenerateCargoPackageLockfileRequest,
+    rustup: RustupTool,
+    platform: Platform,
 ) -> GenerateCargoLockfile:
-    pass
+    toolchain, source_files = await MultiGet(
+        Get(
+            RustToolchain,
+            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
+        ),
+        Get(SourceFiles, CargoSourcesRequest(frozenset([req.package.address]))),
+    )
+
+    print(f"toolchain: {toolchain}")
+    print(f"source_files: {source_files}")
+    raise ValueError(f"not implemented yet")
 
 
 @rule
@@ -100,53 +119,30 @@ async def setup_user_lockfile_requests(
     requested: RequestedCargoUserResolveNames,
     all_targets: AllCargoTargets,
 ) -> UserGenerateLockfiles:
-    print(requested)
-    raise ValueError("foobar")
+    packages = []
+    workspaces = []
 
-    # for tgt in sorted(all_targets, key=lambda t: t.address):
-    #     if tgt.has_field(WorkspaceSources):
-    #         workspaces.append(tgt)
+    for resolve in requested:
+        for package in all_targets.packages:
+            if str(package.address) == resolve:
+                packages.append(
+                    GenerateCargoPackageLockfileRequest(
+                        package,
+                    )
+                )
 
-    #     if tgt.has_field(CargoSources):
-    #         packages.append(tgt)
+        for workspace in all_targets.workspaces:
+            if str(workspace.address) == resolve:
+                workspaces.append(
+                    GenerateCargoWorkspaceLockfileRequest(
+                        workspace,
+                        tuple(workspace.members),
+                    ),
+                )
 
-    # workspace_to_packages = defaultdict(list)
-
-    # solo_packages = []
-    # for pkg in packages:
-    #     for workspace in workspaces:
-    #         print(f"Adding {pkg.address} to {workspace.get(WorkspacePackages).value}")
-    #         if pkg.address in workspace.get(WorkspacePackages).value:
-    #             workspace_to_packages[workspace].append(pkg)
-    #             break
-    #     else:
-    #         solo_packages.append(pkg)
-
-    # workspace_requests = [
-    #     Get(
-    #         GenerateCargoLockfile,
-    #         GenerateCargoWorkspaceLockfileRequest(
-    #             workspace=workspace,
-    #             packages=tuple(workspace_to_packages[workspace]),
-    #         ),
-    #     )
-    #     for resolve in requested
-    # ]
-
-    # package_requests = [
-    #     Get(
-    #         GenerateCargoLockfile,
-    #         GenerateCargoPackageLockfileRequest(
-    #             package=package,
-    #         ),
-    #     )
-    #     for package in solo_packages
-    # ]
-
-    # rust_lockfile_requests = await MultiGet(
-    #     *(workspace_requests + package_requests),
-    # )
-    return UserGenerateLockfiles(rust_lockfile_requests)
+    print(f"packages: {packages}")
+    print(f"workspaces: {workspaces}")
+    return UserGenerateLockfiles(packages + workspaces)
 
 
 def rules():
@@ -155,4 +151,6 @@ def rules():
         UnionRule(GenerateLockfile, GenerateCargoLockfile),
         UnionRule(KnownUserResolveNamesRequest, KnownCargoUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedCargoUserResolveNames),
+        UnionRule(GenerateLockfile, GenerateCargoPackageLockfileRequest),
+        UnionRule(GenerateLockfile, GenerateCargoWorkspaceLockfileRequest),
     )
