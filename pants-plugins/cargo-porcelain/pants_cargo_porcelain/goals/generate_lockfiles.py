@@ -98,13 +98,12 @@ async def generate_rust_workspace_lockfile(
     rustup: RustupTool,
     platform: Platform,
 ) -> GenerateLockfileResult:
-    toolchain, source_files = await MultiGet(
-        Get(
-            RustToolchain,
-            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
-        ),
-        Get(SourceFiles, CargoSourcesRequest(frozenset([req.workspace.address]))),
+    toolchain = await Get(
+        RustToolchain,
+        RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
     )
+
+    source_files = await Get(SourceFiles, CargoSourcesRequest(frozenset([req.workspace.address])))
 
     cargo_toml_path = f"{req.workspace.address.spec_path}/Cargo.toml"
     process_result = await Get(
@@ -118,6 +117,7 @@ async def generate_rust_workspace_lockfile(
             ),
             source_files.snapshot.digest,
             output_files=(f"{req.workspace.address.spec_path}/Cargo.lock",),
+            description=f"Generate lockfile for {req.workspace.address}",
         ),
     )
 

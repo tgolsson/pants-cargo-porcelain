@@ -123,16 +123,20 @@ async def assign_packages_to_workspaces(
     for ws, cargo_content in zip(all_cargo_targets.workspaces, workspace_cargo_toml):
         toml_data = toml.loads(cargo_content.contents.decode("utf-8"))
         members = toml_data["workspace"].get("members", [])
+        globs = [f"{ws.address.spec_path}/{member}" for member in members]
+        if "package" in toml_data:
+            globs.append(ws.address.spec_path)
+            members.append(".")
 
         candidate_targets_per_member = await MultiGet(
             Get(
                 Targets,
                 RawSpecs(
-                    dir_globs=(DirGlobSpec(f"{ws.address.spec_path}/{member}"),),
+                    dir_globs=(DirGlobSpec(glob),),
                     description_of_origin="Assigning packages to workspaces",
                 ),
             )
-            for member in members
+            for glob in globs
         )
 
         workspace_members = []

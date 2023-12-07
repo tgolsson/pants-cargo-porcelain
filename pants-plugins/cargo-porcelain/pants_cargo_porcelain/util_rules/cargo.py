@@ -35,6 +35,7 @@ class CargoProcessRequest:
     output_files: tuple[str, ...] = ()
 
     cache_path: str | None = None
+    description: str | None = None
 
 
 @dataclass(frozen=True)
@@ -128,16 +129,19 @@ async def make_cargo_process(
     set -euo pipefail
     export CARGO_HOME=$(realpath .cargo)
     export RUSTUP_HOME=$(realpath .rustup)
+
     {req.toolchain.cargo} {command}
     """
 
     digest = await Get(Digest, CreateDigest([FileContent("run.sh", script.encode())]))
     merged_digest = await Get(Digest, MergeDigests([digest, req.digest]))
 
+    description = req.description or f'Run `cargo {" ".join(req.command)}`'
+
     return Process(
         argv=(bash.path, "run.sh"),
         input_digest=merged_digest,
-        description=f"Run {req.command} with {req.toolchain}",
+        description=description,
         append_only_caches=append_only_caches,
         output_files=output_files,
         immutable_input_digests=binary_shims.immutable_input_digests,
