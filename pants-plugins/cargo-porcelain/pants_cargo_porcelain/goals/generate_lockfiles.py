@@ -95,8 +95,37 @@ def wrap_workspace_lockfile_request(
 @rule
 async def generate_rust_workspace_lockfile(
     req: GenerateCargoWorkspaceLockfileRequest,
+    rustup: RustupTool,
+    platform: Platform,
 ) -> GenerateLockfileResult:
-    pass
+    toolchain, source_files = await MultiGet(
+        Get(
+            RustToolchain,
+            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
+        ),
+        Get(SourceFiles, CargoSourcesRequest(frozenset([req.workspace.address]))),
+    )
+
+    cargo_toml_path = f"{req.workspace.address.spec_path}/Cargo.toml"
+    process_result = await Get(
+        ProcessResult,
+        CargoProcessRequest(
+            toolchain,
+            (
+                "update",
+                "--color=always",
+                f"--manifest-path={cargo_toml_path}",
+            ),
+            source_files.snapshot.digest,
+            output_files=(f"{req.workspace.address.spec_path}/Cargo.lock",),
+        ),
+    )
+
+    return GenerateLockfileResult(
+        process_result.output_digest,
+        str(req.workspace.address),
+        f"{req.workspace.address.spec_path}/Cargo.lock",
+    )
 
 
 @rule
