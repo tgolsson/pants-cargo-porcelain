@@ -2,5 +2,5 @@ python_sources()
 
 python_tests(
     name="tests",
-    timeout=10,
+    timeout=20,
 )

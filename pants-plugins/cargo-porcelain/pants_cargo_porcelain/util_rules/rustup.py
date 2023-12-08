@@ -1,5 +1,6 @@
 import fcntl
 import os
+import time
 from dataclasses import dataclass
 
 from pants.base.build_environment import get_pants_cachedir
@@ -105,6 +106,7 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
 
     lock_file_path = os.path.join(get_pants_cachedir(), "locks", ".rustup")
     with FileLock(lock_file_path):
+        time.sleep(0.1)
         _ = await Get(
             ProcessResult,
             Process(
@@ -122,7 +124,7 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
             ),
         )
-
+        time.sleep(0.1)
         _ = await Get(
             ProcessResult,
             Process(
@@ -140,7 +142,7 @@ async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
                 env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
             ),
         )
-
+        time.sleep(0.1)
         if request.components:
             _ = await Get(
                 ProcessResult,

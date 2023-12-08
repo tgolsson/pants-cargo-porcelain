@@ -7,6 +7,7 @@ import pytest
 from pants.build_graph.address import Address
 from pants.core.goals.generate_lockfiles import rules as goal_rules
 from pants.core.util_rules import external_tool, source_files
+from pants.engine.fs import Digest
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
@@ -18,14 +19,8 @@ from pants_cargo_porcelain.goals.generate_lockfiles import (
 )
 from pants_cargo_porcelain.goals.generate_lockfiles import rules as generate_lockfiles_rules
 from pants_cargo_porcelain.target_generator import rules as target_generator_rules
-from pants_cargo_porcelain.target_types import (
-    CargoPackageTarget,
-    CargoPackageTargetImpl,
-    CargoWorkspaceTarget,
-)
 from pants_cargo_porcelain.util_rules import cargo, dependency_inference, rustup, workspace
 from pants_cargo_porcelain.util_rules.sandbox import rules as sandbox_rules
-from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets
 
 
 @pytest.fixture
@@ -76,4 +71,9 @@ def test_lock_workspace(rule_runner: RuleRunner) -> None:
         ],
     )
 
-    assert generate_lockfile_result == None
+    assert generate_lockfile_result == GenerateLockfileResult(
+        digest=Digest("056d417693d004475d6bf861087e02bb1d67c8a76beec304d30339bd2fd52126", 83),
+        resolve_name="with_root:workspace",
+        path="with_root/Cargo.lock",
+        diff=None,
+    )
