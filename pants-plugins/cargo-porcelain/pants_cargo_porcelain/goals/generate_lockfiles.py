@@ -11,7 +11,6 @@ from pants.core.goals.generate_lockfiles import (
     WrappedGenerateLockfile,
 )
 from pants.core.util_rules.source_files import SourceFiles
-from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule

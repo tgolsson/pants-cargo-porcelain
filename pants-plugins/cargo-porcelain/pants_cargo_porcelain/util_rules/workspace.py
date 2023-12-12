@@ -7,6 +7,7 @@ from pants.build_graph.address import Address
 from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
@@ -53,9 +54,6 @@ class CargoToml:
 @dataclass(frozen=True)
 class CargoTomlRequest:
     sources: MultipleSourcesField
-
-
-from pants.option.global_options import UnmatchedBuildFileGlobs
 
 
 @rule(desc="Load Cargo.toml for Cargo target")
