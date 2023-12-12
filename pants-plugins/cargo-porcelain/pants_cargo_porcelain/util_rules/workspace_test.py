@@ -47,13 +47,11 @@ def rule_runner() -> RuleRunner:
 
 
 def test_find_package_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "with_root/Cargo.toml": '[package]\nname="foobar"\nversion = "0.1.0"',
-            "with_root/BUILD": "cargo_package()",
-            "with_root/src/lib.rs": "",
-        }
-    )
+    rule_runner.write_files({
+        "with_root/Cargo.toml": '[package]\nname="foobar"\nversion = "0.1.0"',
+        "with_root/BUILD": "cargo_package()",
+        "with_root/src/lib.rs": "",
+    })
     rust_targets = rule_runner.request(AllCargoTargets, [])
 
     package = rule_runner.get_target(
@@ -63,12 +61,10 @@ def test_find_package_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_find_workspace_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "with_root/Cargo.toml": "[workspace]",
-            "with_root/BUILD": 'cargo_workspace(name="workspace")',
-        }
-    )
+    rule_runner.write_files({
+        "with_root/Cargo.toml": "[workspace]",
+        "with_root/BUILD": 'cargo_workspace(name="workspace")',
+    })
     rust_targets = rule_runner.request(AllCargoTargets, [])
 
     ws = rule_runner.get_target(Address("with_root", target_name="workspace"))
@@ -76,13 +72,11 @@ def test_find_workspace_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_find_all_rust_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "with_root/Cargo.toml": '[workspace]\n[package]\nname="foobar"\nversion = "0.1.0"',
-            "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
-            "with_root/src/lib.rs": "",
-        }
-    )
+    rule_runner.write_files({
+        "with_root/Cargo.toml": '[workspace]\n[package]\nname="foobar"\nversion = "0.1.0"',
+        "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
+        "with_root/src/lib.rs": "",
+    })
     rust_targets = rule_runner.request(
         AllCargoTargets,
         [],
@@ -96,10 +90,9 @@ def test_find_all_rust_targets(rule_runner: RuleRunner) -> None:
 
 
 def test_root_package(rule_runner) -> None:
-    rule_runner.write_files(
-        {
-            "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
-            "with_root/Cargo.toml": """
+    rule_runner.write_files({
+        "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
+        "with_root/Cargo.toml": """
 [workspace]
 members = []
 [package]
@@ -109,9 +102,8 @@ edition = "2021"
 
 [dependencies]
 """,
-            "with_root/src/lib.rs": "",
-        }
-    )
+        "with_root/src/lib.rs": "",
+    })
 
     package_mapping = rule_runner.request(
         CargoPackageMapping,
@@ -126,14 +118,10 @@ edition = "2021"
         Address("with_root", target_name="with_root", generated_name="sources")
     )
     assert package_mapping == CargoPackageMapping(
-        FrozenDict(
-            {
-                ws.address: frozenset(
-                    {
-                        CargoWorkspaceMember(".", package, sources),
-                    }
-                )
-            }
-        ),
+        FrozenDict({
+            ws.address: frozenset({
+                CargoWorkspaceMember(".", package, sources),
+            })
+        }),
         set(),
     )

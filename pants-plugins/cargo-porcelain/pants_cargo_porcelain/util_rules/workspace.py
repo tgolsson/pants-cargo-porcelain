@@ -4,7 +4,6 @@ from dataclasses import dataclass
 import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets

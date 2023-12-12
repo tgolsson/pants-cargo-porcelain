@@ -50,13 +50,11 @@ def rule_runner() -> RuleRunner:
 
 
 def test_lock_workspace(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files(
-        {
-            "with_root/Cargo.toml": '[workspace]\n[package]\nname="foobar"\nversion = "0.1.0"',
-            "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
-            "with_root/src/lib.rs": "",
-        }
-    )
+    rule_runner.write_files({
+        "with_root/Cargo.toml": '[workspace]\n[package]\nname="foobar"\nversion = "0.1.0"',
+        "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
+        "with_root/src/lib.rs": "",
+    })
 
     ws = rule_runner.get_target(Address("with_root", target_name="workspace"))
     generate_lockfile_result = rule_runner.request(

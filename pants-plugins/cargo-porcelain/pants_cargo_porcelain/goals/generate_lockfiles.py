@@ -1,4 +1,3 @@
-from collections import defaultdict
 from dataclasses import dataclass
 
 from pants.core.goals.generate_lockfiles import (
@@ -11,28 +10,21 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
     WrappedGenerateLockfile,
 )
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets
 from pants.engine.unions import UnionRule
-from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.internal.build import platform_to_target
-from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
-from pants_cargo_porcelain.target_types import (
-    CargoPackageSourcesField,
-    CargoPackageTarget,
-    CargoWorkspaceTarget,
-)
+from pants_cargo_porcelain.subsystems import RustupTool
+from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
 from pants_cargo_porcelain.util_rules.workspace import (
     AllCargoTargets,
-    CargoPackageMapping,
     assign_packages_to_workspaces,
 )
 
