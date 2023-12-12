@@ -4,10 +4,10 @@ from dataclasses import dataclass
 import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs
+from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets
+from pants.option.global_options import UnmatchedBuildFileGlobs
 from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
@@ -58,15 +58,14 @@ class CargoTomlRequest:
 
 @rule(desc="Load Cargo.toml for Cargo target")
 async def load_cargo_toml(request: CargoTomlRequest) -> CargoToml:
-    files = await Get(
-        SourceFiles,
-        SourceFilesRequest(
-            [request.sources],
-        ),
+    snapshot = await Get(
+        Snapshot,
+        PathGlobs,
+        request.sources.path_globs(UnmatchedBuildFileGlobs.error()),
     )
 
     digest_contents = await Get(
-        DigestContents, DigestSubset(files.snapshot.digest, PathGlobs(["**/Cargo.toml"]))
+        DigestContents, DigestSubset(snapshot.digest, PathGlobs(["**/Cargo.toml"]))
     )
 
     return CargoToml(digest_contents[0].content)
@@ -121,16 +120,20 @@ async def assign_packages_to_workspaces(
     for ws, cargo_content in zip(all_cargo_targets.workspaces, workspace_cargo_toml):
         toml_data = toml.loads(cargo_content.contents.decode("utf-8"))
         members = toml_data["workspace"].get("members", [])
+        globs = [f"{ws.address.spec_path}/{member}" for member in members]
+        if "package" in toml_data:
+            globs.append(ws.address.spec_path)
+            members.append(".")
 
         candidate_targets_per_member = await MultiGet(
             Get(
                 Targets,
                 RawSpecs(
-                    dir_globs=(DirGlobSpec(f"{ws.address.spec_path}/{member}"),),
+                    dir_globs=(DirGlobSpec(glob),),
                     description_of_origin="Assigning packages to workspaces",
                 ),
             )
-            for member in members
+            for glob in globs
         )
 
         workspace_members = []
