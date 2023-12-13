@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 
+from pants.core.goals.package import OutputPathField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
@@ -82,7 +83,7 @@ async def generate_cargo_generated_target(
         if "bin" in target["kind"]:
             binaries.append(target)
 
-        if "lib" in target["kind"]:
+        if "lib" in target["kind"] or "cdylib" in target["kind"]:
             libraries.append(target)
 
         if "test" in target["kind"]:
@@ -121,6 +122,7 @@ async def generate_cargo_generated_target(
                     CargoLibraryNameField.alias: target["name"],
                     CargoPackageDependenciesField.alias: [package_address],
                     **request.template,
+                    OutputPathField.alias: request.generator.get(OutputPathField).value,
                 },
                 name,
             )
@@ -134,6 +136,7 @@ async def generate_cargo_generated_target(
                 {
                     CargoPackageDependenciesField.alias: [package_address],
                     CargoBinaryNameField.alias: target["name"],
+                    OutputPathField.alias: request.generator.get(OutputPathField).value,
                     **request.template,
                 },
                 name,

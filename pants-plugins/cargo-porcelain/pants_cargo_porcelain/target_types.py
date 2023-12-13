@@ -92,7 +92,6 @@ class CargoPackageTarget(TargetGenerator):
     copied_fields = (
         *COMMON_TARGET_FIELDS,
         SkipCargoTestsField,
-        OutputPathField,
         EnvironmentField,
         _CargoPackageMarker,
     )
@@ -122,7 +121,6 @@ class CargoPackageTargetImpl(Target):
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
         SkipCargoTestsField,
-        OutputPathField,
         EnvironmentField,
         CargoPackageNameField,
         _CargoPackageMarker,
@@ -139,7 +137,6 @@ class CargoSourcesTarget(Target):
         CargoPackageDependenciesField,
         CargoPackageSourcesField,
         SkipCargoTestsField,
-        OutputPathField,
         EnvironmentField,
         CargoPackageNameField,
         _CargoSourcesMarker,
@@ -170,7 +167,6 @@ class CargoTestTarget(Target):
         *COMMON_TARGET_FIELDS,
         CargoPackageDependenciesField,
         SkipCargoTestsField,
-        OutputPathField,
         EnvironmentField,
         CargoTestNameField,
         CargoPackageSourcesField,

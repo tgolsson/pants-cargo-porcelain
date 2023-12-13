@@ -16,6 +16,7 @@ backend_packages = [
 
   "pants_cargo_porcelain",
   "pants_cargo_porcelain.backends.clippy",
+  "pants_cargo_porcelain.backends.python",
 ]
 
 pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
@@ -63,7 +64,7 @@ execution_slot_var = "TEST_EXECUTION_SLOT"
 install_from_resolve = "pytest"
 
 [source]
-root_patterns = []
+root_patterns = ["examples/python-package/src"]
 marker_filenames = ["pyproject.toml"]
 
 [anonymous-telemetry]
