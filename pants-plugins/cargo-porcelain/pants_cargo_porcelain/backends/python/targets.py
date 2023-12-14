@@ -10,8 +10,6 @@ from pants.core.goals.package import (
     PackageFieldSet,
     TraverseIfNotPackageTarget,
 )
-from pants.core.target_types import ResourceSourceField
-from pants.core.util_rules.system_binaries import BinaryShims, BinaryShimsRequest
 from pants.engine.fs import CreateDigest, Digest, DigestEntries, MergeDigests, Snapshot
 from pants.engine.rules import Get, MultiGet, collect_rules, rule
 from pants.engine.target import (
@@ -52,11 +50,9 @@ class PythonExtensionsTarget(Target):
     alias = "python_extension"
     core_fields = (*COMMON_TARGET_FIELDS, PackagesField, Dummy, ModuleNameField, OutputPathField)
 
-    help = help_text(
-        """
+    help = help_text("""
 
-        """
-    )
+        """)
 
 
 @rule
