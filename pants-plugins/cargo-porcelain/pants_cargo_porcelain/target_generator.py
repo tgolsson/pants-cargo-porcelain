@@ -9,7 +9,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 from pants.engine.target import GeneratedTargets, GenerateTargetsRequest
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 
 from pants_cargo_porcelain.internal.build import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
@@ -42,6 +42,7 @@ async def generate_cargo_generated_target(
     rust: RustSubsystem,
     rustup: RustupTool,
     platform: Platform,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
     source_files, toolchain = await MultiGet(
         Get(
@@ -95,17 +96,21 @@ async def generate_cargo_generated_target(
     package = request.generator.address.create_generated("package")
     package_address = str(package)
 
+    def _filter_target_fields(template, target):
+        target_field_names = {t.alias for t in target.class_field_types(union_membership)}
+        return {k: v for k, v in template.items() if k in target_field_names}
+
     generated_targets = [
         CargoSourcesTarget(
             {
-                **request.template,
+                **_filter_target_fields(request.template, CargoSourcesTarget),
                 _CargoSourcesMarker.alias: "yes",
             },
             sources,
         ),
         CargoPackageTargetImpl(
             {
-                **request.template,
+                **_filter_target_fields(request.template, CargoPackageTargetImpl),
                 CargoPackageNameField.alias: output["packages"][0]["name"],
                 CargoPackageDependenciesField.alias: [sources_address],
             },
@@ -121,7 +126,7 @@ async def generate_cargo_generated_target(
                 {
                     CargoLibraryNameField.alias: target["name"],
                     CargoPackageDependenciesField.alias: [package_address],
-                    **request.template,
+                    **_filter_target_fields(request.template, CargoLibraryTarget),
                     OutputPathField.alias: request.generator.get(OutputPathField).value,
                 },
                 name,
@@ -137,7 +142,7 @@ async def generate_cargo_generated_target(
                     CargoPackageDependenciesField.alias: [package_address],
                     CargoBinaryNameField.alias: target["name"],
                     OutputPathField.alias: request.generator.get(OutputPathField).value,
-                    **request.template,
+                    **_filter_target_fields(request.template, CargoBinaryTarget),
                 },
                 name,
             )
@@ -148,7 +153,7 @@ async def generate_cargo_generated_target(
         generated_targets.append(
             CargoTestTarget(
                 {
-                    **request.template,
+                    **_filter_target_fields(request.template, CargoTestTarget),
                     CargoPackageDependenciesField.alias: [package_address],
                     CargoTestNameField.alias: target["name"],
                     CargoPackageSourcesField.alias: [

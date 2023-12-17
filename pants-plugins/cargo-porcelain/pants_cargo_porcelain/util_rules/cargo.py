@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
 from pants.backend.python.util_rules.pex_environment import PythonExecutable
@@ -39,6 +39,8 @@ class CargoProcessRequest:
 
     cache_path: str | None = None
     description: str | None = None
+
+    extra_env_variables: FrozenDict = field(default_factory=FrozenDict)
 
 
 @dataclass(frozen=True)
@@ -105,8 +107,8 @@ async def make_cargo_process(
         rationale="rustc",
         search_path=SEARCH_PATHS,
     )
-
     request = dataclasses.replace(request, paths=(py,))
+
     binary_shims = await Get(BinaryShims, BinaryShimsRequest, request)
 
     append_only_caches = BOTH_CACHES
