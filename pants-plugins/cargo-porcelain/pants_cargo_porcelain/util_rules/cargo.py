@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import dataclasses
+from dataclasses import dataclass, field
 
+from pants.backend.python.util_rules.interpreter_constraints import InterpreterConstraints
+from pants.backend.python.util_rules.pex_environment import PythonExecutable
 from pants.core.util_rules.system_binaries import (
     SEARCH_PATHS,
     BashBinary,
@@ -36,6 +39,8 @@ class CargoProcessRequest:
 
     cache_path: str | None = None
     description: str | None = None
+
+    extra_env_variables: FrozenDict = field(default_factory=FrozenDict)
 
 
 @dataclass(frozen=True)
@@ -92,24 +97,26 @@ async def make_cargo_process(
     ld: LDBinary,
     bash: BashBinary,
 ) -> Process:
-    binary_shims = await Get(
-        BinaryShims,
-        BinaryShimsRequest.for_binaries(
-            "cc",
-            "ld",
-            "as",
-            "ar",
-            "realpath",
-            rationale="rustc",
-            search_path=SEARCH_PATHS,
-        ),
+    py = await Get(PythonExecutable, InterpreterConstraints({">=3"}))
+    request = BinaryShimsRequest.for_binaries(
+        "cc",
+        "ld",
+        "as",
+        "ar",
+        "realpath",
+        rationale="rustc",
+        search_path=SEARCH_PATHS,
     )
+    request = dataclasses.replace(request, paths=(py,))
+
+    binary_shims = await Get(BinaryShims, BinaryShimsRequest, request)
 
     append_only_caches = BOTH_CACHES
     env = {
         "PATH": f"{{chroot}}/{req.toolchain.path}/bin:{binary_shims.path_component}",
         "RUSTUP_HOME": RUSTUP_NAMED_CACHE,
         "CARGO_HOME": CARGO_NAMED_CACHE,
+        "PYO3_PYTHON": f"{binary_shims.path_component}/python3.7",
         "RUSTFLAGS": f"-C linker={cc.path}",
         #        "CARGO_LOG": "cargo::core::compiler::fingerprint=trace",
     }

@@ -29,6 +29,20 @@ class CargoBinaryRequest:
     release_mode: bool = False
 
 
+@dataclass(frozen=True)
+class CargoLibrary:
+    digest: Digest
+
+
+@dataclass(frozen=True)
+class CargoLibraryRequest:
+    address: Address
+    sources: CargoPackageSourcesField
+    library_name: str
+
+    release_mode: bool = False
+
+
 def platform_to_target(platform: Platform):
     if platform == Platform.linux_x86_64:
         return "x86_64-unknown-linux-gnu"
@@ -58,9 +72,7 @@ async def build_cargo_binary(
         ),
         Get(
             RustToolchain,
-            RustToolchainRequest(
-                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
-            ),
+            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
         ),
     )
 
@@ -90,6 +102,55 @@ async def build_cargo_binary(
     )
 
     return CargoBinary(process_result.output_digest)
+
+
+@rule
+async def build_cargo_library(
+    req: CargoLibraryRequest,
+    rust: RustSubsystem,
+    rustup: RustupTool,
+    platform: Platform,
+) -> CargoLibrary:
+    source_files, toolchain = await MultiGet(
+        Get(
+            SourceFiles,
+            CargoSourcesRequest(
+                frozenset([req.address]),
+            ),
+        ),
+        Get(
+            RustToolchain,
+            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
+        ),
+    )
+
+    extra_args = []
+    if rust.release:
+        extra_args.append("--release")
+
+    build_level = "debug"
+    if rust.release:
+        build_level = "release"
+
+    normalized_library_name = req.library_name.replace("-", "_")
+    process_result = await Get(
+        ProcessResult,
+        CargoProcessRequest(
+            toolchain,
+            (
+                "build",
+                *extra_args,
+                f"--manifest-path={req.address.spec_path}/Cargo.toml",
+                "--locked",
+                "--lib",
+            ),
+            source_files.snapshot.digest,
+            output_files=(f"{{cache_path}}/{build_level}/lib{normalized_library_name}.so",),
+            cache_path=req.address.spec_path,
+        ),
+    )
+
+    return CargoLibrary(process_result.output_digest)
 
 
 def rules():
