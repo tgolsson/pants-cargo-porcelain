@@ -8,8 +8,10 @@ from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
 
+from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageSourcesField
+from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
@@ -29,24 +31,12 @@ class CargoBinaryRequest:
     release_mode: bool = False
 
 
-def platform_to_target(platform: Platform):
-    if platform == Platform.linux_x86_64:
-        return "x86_64-unknown-linux-gnu"
-    elif platform == Platform.linux_arm64:
-        return "aarch64-unknown-linux-gnu"
-    elif platform == Platform.macos_x86_64:
-        return "x86_64-apple-darwin"
-    elif platform == Platform.macos_arm64:
-        return "aarch64-apple-darwin"
-    else:
-        raise Exception("Unknown platform")
-
-
 @rule
 async def build_cargo_binary(
     req: CargoBinaryRequest,
     rust: RustSubsystem,
     rustup: RustupTool,
+    sccache: Sccache,
     platform: Platform,
 ) -> CargoBinary:
     source_files, toolchain = await MultiGet(
@@ -64,6 +54,11 @@ async def build_cargo_binary(
         ),
     )
 
+    print(sccache, sccache.enabled)
+    if sccache.enabled:
+        sccache_tool = await Get(InstalledRustTool, RustToolRequest, sccache.as_tool_request())
+
+        print(sccache_tool)
     extra_args = []
     if rust.release:
         extra_args.append("--release")

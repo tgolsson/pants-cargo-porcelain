@@ -14,7 +14,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest

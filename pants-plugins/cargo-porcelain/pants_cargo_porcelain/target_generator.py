@@ -10,7 +10,7 @@ from pants.engine.rules import collect_rules, rule
 from pants.engine.target import GeneratedTargets, GenerateTargetsRequest
 from pants.engine.unions import UnionRule
 
-from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import (
     CargoBinaryNameField,

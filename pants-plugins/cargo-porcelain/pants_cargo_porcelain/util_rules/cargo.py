@@ -107,7 +107,7 @@ async def make_cargo_process(
 
     append_only_caches = BOTH_CACHES
     env = {
-        "PATH": f"{{chroot}}/{req.toolchain.path}/bin:{binary_shims.path_component}",
+        "PATH": f"{{chroot}}:{{chroot}}/{req.toolchain.path}/bin:{binary_shims.path_component}",
         "RUSTUP_HOME": RUSTUP_NAMED_CACHE,
         "CARGO_HOME": CARGO_NAMED_CACHE,
         "RUSTFLAGS": f"-C linker={cc.path}",

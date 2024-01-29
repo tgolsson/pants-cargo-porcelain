@@ -5,11 +5,11 @@ from dataclasses import dataclass
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
+from pants.option.option_types import BoolOption, StrListOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
-from pants_cargo_porcelain.internal.build import platform_to_target
+from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustupTool
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
@@ -23,11 +23,9 @@ class RustTool(Subsystem):
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
-        help=lambda cls: softwrap(
-            f"""
+        help=lambda cls: softwrap(f"""
             Version of the tool to install.
-            """
-        ),
+            """),
     )
 
     def as_tool_request(self, *, version: str | None = None) -> RustToolRequest:
@@ -54,45 +52,21 @@ class InstalledRustTool:
     digest: Digest
 
 
-@rule
-async def get_rust_tool(
-    request: RustToolRequest, rustup: RustupTool, platform: Platform
-) -> InstalledRustTool:
-    toolchain = await Get(
-        RustToolchain,
-        RustToolchainRequest(
-            rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
-        ),
-    )
-
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            (
-                "install",
-                f"{request.tool_name}",
-                f"--version={request.version}",
-                "--root={chroot}",
-            ),
-            output_files=(request.tool_name,),
-        ),
-    )
-
-    return InstalledRustTool(
-        exe={request.tool_name},
-        digest=process_result.output_digest,
-    )
-
-
 class Sccache(RustTool):
     """Sccache helps with."""
 
     options_scope = "sccache"
-    help = ""
+    help = "fff"
 
-    project_name = "cargo-machete"
+    project_name = "sccache"
     default_version = "0.6.0"
+
+    enabled = BoolOption(
+        default=None,
+        help=softwrap("""
+            Can be used to enable or disable `sccache`.
+            """),
+    )
 
 
 def rules():

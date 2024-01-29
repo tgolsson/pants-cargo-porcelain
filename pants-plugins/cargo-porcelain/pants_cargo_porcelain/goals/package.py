@@ -24,7 +24,7 @@ from pants_cargo_porcelain.target_types import CargoBinaryNameField, CargoPackag
 
 @dataclass(frozen=True)
 class CargoBinaryFieldSet(PackageFieldSet, RunFieldSet):
-    required_fields = (CargoPackageSourcesField, CargoBinaryNameField)
+    required_fields = (OutputPathField, CargoBinaryNameField)
     run_in_sandbox_behavior = RunInSandboxBehavior.RUN_REQUEST_HERMETIC
 
     binary_name: CargoBinaryNameField
