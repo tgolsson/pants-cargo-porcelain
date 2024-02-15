@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pants.engine.fs import Digest
 from pants.engine.rules import collect_rules
 from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
