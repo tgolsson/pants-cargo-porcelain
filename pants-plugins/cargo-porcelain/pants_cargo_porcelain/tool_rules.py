@@ -1,15 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.fs import EMPTY_DIGEST, Digest, RemovePrefix
+from pants.engine.fs import Digest, RemovePrefix
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import Get, collect_rules, rule
-from pants.option.option_types import StrListOption, StrOption
-from pants.option.subsystem import Subsystem
-from pants.util.strutil import softwrap
 
 from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustupTool
@@ -33,8 +28,6 @@ async def get_rust_tool(
         ),
     )
 
-    command = "install"
-    extra_digests = EMPTY_DIGEST
     if binstall.enable:
         binstall_tool = await Get(
             DownloadedExternalTool, ExternalToolRequest, binstall.get_request(platform)
@@ -76,7 +69,7 @@ async def get_rust_tool(
             Digest,
             RemovePrefix(
                 process_result.output_digest,
-                f"bin",
+                "bin",
             ),
         )
 

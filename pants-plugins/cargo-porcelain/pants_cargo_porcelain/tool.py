@@ -2,17 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
-from pants.option.option_types import BoolOption, StrListOption, StrOption
+from pants.engine.rules import collect_rules
+from pants.option.option_types import BoolOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
-
-from pants_cargo_porcelain.internal.platform import platform_to_target
-from pants_cargo_porcelain.subsystems import RustupTool
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 
 
 class RustTool(Subsystem):
@@ -23,7 +16,7 @@ class RustTool(Subsystem):
     version = StrOption(
         advanced=True,
         default=lambda cls: cls.default_version,
-        help=lambda cls: softwrap(f"""
+        help=lambda cls: softwrap("""
             Version of the tool to install.
             """),
     )

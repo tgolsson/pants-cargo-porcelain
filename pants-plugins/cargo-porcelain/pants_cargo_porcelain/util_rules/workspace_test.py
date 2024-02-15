@@ -118,10 +118,12 @@ edition = "2021"
         Address("with_root", target_name="with_root", generated_name="sources")
     )
     assert package_mapping == CargoPackageMapping(
-        FrozenDict({
-            ws.address: frozenset({
-                CargoWorkspaceMember(".", package, sources),
-            })
-        }),
+        FrozenDict(
+            {
+                ws.address: frozenset({
+                    CargoWorkspaceMember(".", package, sources),
+                })
+            }
+        ),
         set(),
     )

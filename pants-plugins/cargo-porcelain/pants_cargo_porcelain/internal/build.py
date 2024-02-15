@@ -63,7 +63,7 @@ async def build_cargo_binary(
         sccache_tool = await Get(InstalledRustTool, RustToolRequest, sccache.as_tool_request())
 
         immutable_input_digests[".sccache"] = sccache_tool.digest
-        env["RUSTC_WRAPPER"] = f"{{chroot}}/.sccache/sccache"
+        env["RUSTC_WRAPPER"] = "{chroot}/.sccache/sccache"
         append_only_caches["sccache"] = ".sccache-cache"
 
     if rust.release:

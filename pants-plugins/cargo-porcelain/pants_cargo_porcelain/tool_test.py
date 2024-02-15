@@ -1,17 +1,15 @@
 import pytest
 from pants.core.util_rules import external_tool
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
 from pants.engine.process import rules as process_rules
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 from pants_cargo_porcelain.subsystems import rules as subsystem_rules
-from pants_cargo_porcelain.tool import InstalledRustTool, RustTool, RustToolRequest, Sccache
+from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
 from pants_cargo_porcelain.tool import rules as tool_rules
 from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
 from pants_cargo_porcelain.tools.binstall import binstall_rules
 from pants_cargo_porcelain.util_rules.cargo import rules as cargo_rules
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.rustup import rules as rustup_rules
 
 

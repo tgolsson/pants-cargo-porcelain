@@ -1,7 +1,6 @@
 from pants.core.util_rules.external_tool import ExternalTool
 from pants.engine.platform import Platform
-from pants.option.option_types import BoolOption, SkipOption, StrOption
-from pants.option.subsystem import Subsystem
+from pants.option.option_types import BoolOption
 from pants.util.strutil import softwrap
 
 
