@@ -35,7 +35,12 @@ class CargoProcessRequest:
     output_files: tuple[str, ...] = ()
 
     cache_path: str | None = None
+
     description: str | None = None
+
+    immutable_input_digests: map[str, Digest] = FrozenDict()
+    append_only_caches: map[str, str] = FrozenDict()
+    env: map[str, str] = FrozenDict()
 
 
 @dataclass(frozen=True)
@@ -105,14 +110,18 @@ async def make_cargo_process(
         ),
     )
 
-    append_only_caches = BOTH_CACHES
+    append_only_caches = FrozenDict({**BOTH_CACHES, **req.append_only_caches})
     env = {
         "PATH": f"{{chroot}}:{{chroot}}/{req.toolchain.path}/bin:{binary_shims.path_component}",
         "RUSTUP_HOME": RUSTUP_NAMED_CACHE,
         "CARGO_HOME": CARGO_NAMED_CACHE,
         "RUSTFLAGS": f"-C linker={cc.path}",
-        #        "CARGO_LOG": "cargo::core::compiler::fingerprint=trace",
+        **req.env,
     }
+
+    if req.immutable_input_digests:
+        for path, digest in req.immutable_input_digests.items():
+            env["PATH"] = f"{{chroot}}/{path}:{env['PATH']}"
 
     output_files = req.output_files
     if req.cache_path:
@@ -144,7 +153,10 @@ async def make_cargo_process(
         description=description,
         append_only_caches=append_only_caches,
         output_files=output_files,
-        immutable_input_digests=binary_shims.immutable_input_digests,
+        immutable_input_digests={
+            **binary_shims.immutable_input_digests,
+            **req.immutable_input_digests,
+        },
         level=LogLevel.DEBUG,
         env=env,
     )

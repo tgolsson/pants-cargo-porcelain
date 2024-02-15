@@ -7,6 +7,7 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
@@ -39,6 +40,10 @@ async def build_cargo_binary(
     sccache: Sccache,
     platform: Platform,
 ) -> CargoBinary:
+    immutable_input_digests = {}
+    env = {}
+    extra_args = []
+    append_only_caches = {}
     source_files, toolchain = await MultiGet(
         Get(
             SourceFiles,
@@ -54,12 +59,13 @@ async def build_cargo_binary(
         ),
     )
 
-    print(sccache, sccache.enabled)
     if sccache.enabled:
         sccache_tool = await Get(InstalledRustTool, RustToolRequest, sccache.as_tool_request())
 
-        print(sccache_tool)
-    extra_args = []
+        immutable_input_digests[".sccache"] = sccache_tool.digest
+        env["RUSTC_WRAPPER"] = f"{{chroot}}/.sccache/sccache"
+        append_only_caches["sccache"] = ".sccache-cache"
+
     if rust.release:
         extra_args.append("--release")
 
@@ -81,6 +87,9 @@ async def build_cargo_binary(
             source_files.snapshot.digest,
             output_files=(f"{{cache_path}}/{build_level}/{req.binary_name}",),
             cache_path=req.address.spec_path,
+            immutable_input_digests=FrozenDict(immutable_input_digests),
+            env=FrozenDict(env),
+            append_only_caches=FrozenDict(append_only_caches),
         ),
     )
 

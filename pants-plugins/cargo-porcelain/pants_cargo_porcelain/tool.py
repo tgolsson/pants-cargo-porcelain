@@ -59,7 +59,7 @@ class Sccache(RustTool):
     help = "fff"
 
     project_name = "sccache"
-    default_version = "0.6.0"
+    default_version = "0.7.7"
 
     enabled = BoolOption(
         default=None,
