@@ -8,7 +8,7 @@ from pants_cargo_porcelain.subsystems import rules as subsystem_rules
 from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
 from pants_cargo_porcelain.tool import rules as tool_rules
 from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
-from pants_cargo_porcelain.tools.binstall import binstall_rules
+from pants_cargo_porcelain.tools.binstall import rules as binstall_rules
 from pants_cargo_porcelain.util_rules.cargo import rules as cargo_rules
 from pants_cargo_porcelain.util_rules.rustup import rules as rustup_rules
 
