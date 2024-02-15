@@ -6,8 +6,10 @@ from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
 from pants_cargo_porcelain.subsystems import rules as subsystem_rules
-from pants_cargo_porcelain.tool import InstalledRustTool, Machete, RustTool, RustToolRequest
+from pants_cargo_porcelain.tool import InstalledRustTool, RustTool, RustToolRequest, Sccache
 from pants_cargo_porcelain.tool import rules as tool_rules
+from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
+from pants_cargo_porcelain.tools.binstall import binstall_rules
 from pants_cargo_porcelain.util_rules.cargo import rules as cargo_rules
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.rustup import rules as rustup_rules
@@ -23,14 +25,17 @@ def rule_runner() -> RuleRunner:
             *rustup_rules(),
             *process_rules(),
             *cargo_rules(),
+            *tool_rules_rules(),
+            *binstall_rules(),
             QueryRule(InstalledRustTool, [RustToolRequest]),
-            QueryRule(Machete, []),
+            QueryRule(Sccache, []),
         ]
     )
 
 
-def test_platform_install_machete(
+def test_platform_install_sccache(
     rule_runner,
 ):
-    machete = rule_runner.request(Machete, [])
-    rule_runner.request(InstalledRustTool, [machete.as_tool_request()])
+    rule_runner.set_options(["--binstall-enable"])
+    sccache = rule_runner.request(Sccache, [])
+    rule_runner.request(InstalledRustTool, [sccache.as_tool_request()])
