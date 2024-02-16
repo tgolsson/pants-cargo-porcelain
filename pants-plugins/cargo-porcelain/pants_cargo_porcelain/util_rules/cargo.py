@@ -105,6 +105,7 @@ async def make_cargo_process(
             "as",
             "ar",
             "realpath",
+            "cargo-mtime-memoize",
             rationale="rustc",
             search_path=SEARCH_PATHS,
         ),
@@ -123,6 +124,7 @@ async def make_cargo_process(
         for path, digest in req.immutable_input_digests.items():
             env["PATH"] = f"{{chroot}}/{path}:{env['PATH']}"
 
+    mtime_snippet = ""
     output_files = req.output_files
     if req.cache_path:
         append_only_caches = FrozenDict({"ctc": ".cargo-target-cache", **append_only_caches})
@@ -132,15 +134,25 @@ async def make_cargo_process(
             f.replace("{cache_path}", env["CARGO_TARGET_DIR"]) for f in output_files
         )
 
+        mtime_snippet = f"""export CARGO_MTIME_DB_PATH=".cargo-target-cache/{req.cache_path}.db"
+    export CARGO_MTIME_ROOT="."
+        exit 0
+    cargo-mtime-memoize
+
+"""
+
     command = " ".join(req.command)
     script = f"""
     #!/usr/bin/env bash
     set -euo pipefail
     export CARGO_HOME=$(realpath .cargo)
     export RUSTUP_HOME=$(realpath .rustup)
+    if [[ -v CARGO_TARGET_DIR ]]; then
+        export CARGO_TARGET_DIR=$(realpath "$CARGO_TARGET_DIR")
+    fi
     export SCCACHE_DIR=$(realpath .sccache-cache)/{req.cache_path}
     export SCCACHE_SERVER_PORT=$((1024+ RANDOM % 20000))
-
+    {mtime_snippet}
     {req.toolchain.cargo} {command}
     """
 
