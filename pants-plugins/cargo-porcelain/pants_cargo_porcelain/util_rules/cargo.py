@@ -138,6 +138,8 @@ async def make_cargo_process(
     set -euo pipefail
     export CARGO_HOME=$(realpath .cargo)
     export RUSTUP_HOME=$(realpath .rustup)
+    export SCCACHE_DIR=$(realpath .sccache-cache)/{req.cache_path}
+    export SCCACHE_SERVER_PORT=$((1024+ RANDOM % 20000))
 
     {req.toolchain.cargo} {command}
     """
