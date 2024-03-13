@@ -17,6 +17,9 @@ from pants_cargo_porcelain.target_types import (
     CargoPackageTargetImpl,
     CargoWorkspaceTarget,
 )
+from pants_cargo_porcelain.tool import rules as tool_rules
+from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
+from pants_cargo_porcelain.tools.mtime import rules as mtime_rules
 from pants_cargo_porcelain.util_rules import cargo, rustup, workspace
 from pants_cargo_porcelain.util_rules.workspace import (
     AllCargoTargets,
@@ -37,6 +40,9 @@ def rule_runner() -> RuleRunner:
             *rustup.rules(),
             *workspace.rules(),
             *target_generator_rules(),
+            *tool_rules(),
+            *tool_rules_rules(),
+            *mtime_rules(),
             QueryRule(AllCargoTargets, []),
             QueryRule(CargoPackageMapping, []),
         ],

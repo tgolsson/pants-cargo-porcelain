@@ -11,7 +11,7 @@ from pants.core.goals.package import (
 )
 from pants.core.goals.run import RunFieldSet, RunInSandboxBehavior
 from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.fs import AddPrefix, Digest, RemovePrefix
+from pants.engine.fs import AddPrefix, Digest
 from pants.engine.internals.selectors import Get
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule

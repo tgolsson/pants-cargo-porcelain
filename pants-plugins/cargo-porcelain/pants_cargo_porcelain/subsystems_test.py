@@ -7,6 +7,9 @@ from pants.testutil.rule_runner import RuleRunner
 
 from pants_cargo_porcelain.subsystems import RustupTool
 from pants_cargo_porcelain.subsystems import rules as subsystem_rules
+from pants_cargo_porcelain.tool import rules as tool_rules
+from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
+from pants_cargo_porcelain.tools.mtime import rules as mtime_rules
 
 
 @pytest.fixture
@@ -15,6 +18,9 @@ def rule_runner() -> RuleRunner:
         rules=[
             *external_tool.rules(),
             *subsystem_rules(),
+            *tool_rules(),
+            *tool_rules_rules(),
+            *mtime_rules(),
             QueryRule(DownloadedExternalTool, [ExternalToolRequest]),
             QueryRule(RustupTool, []),
         ]
