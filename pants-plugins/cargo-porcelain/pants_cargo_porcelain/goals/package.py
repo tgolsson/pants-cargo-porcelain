@@ -44,20 +44,7 @@ async def package_cargo_binary(
         CargoBinaryRequest(field_set.address, field_set.sources, field_set.binary_name.value),
     )
 
-    build_level = "debug"
-    if rust.release:
-        build_level = "release"
-
-    removed_prefix = await Get(
-        Digest,
-        RemovePrefix(
-            binary.digest, f".cargo-target-cache/{field_set.address.spec_path}/{build_level}"
-        ),
-    )
-
-    renamed_output_digest = await Get(
-        Digest, AddPrefix(removed_prefix, str(output_filename.parent))
-    )
+    renamed_output_digest = await Get(Digest, AddPrefix(binary.digest, str(output_filename.parent)))
 
     artifact = BuiltPackageArtifact(relpath=str(output_filename))
     return BuiltPackage(renamed_output_digest, (artifact,))

@@ -13,6 +13,7 @@ from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageSourcesField
 from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
+from pants_cargo_porcelain.tools.mtime import CargoMtime
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
@@ -38,6 +39,7 @@ async def build_cargo_binary(
     rust: RustSubsystem,
     rustup: RustupTool,
     sccache: Sccache,
+    mtime: CargoMtime,
     platform: Platform,
 ) -> CargoBinary:
     immutable_input_digests = {}
