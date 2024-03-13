@@ -16,7 +16,7 @@ class CargoMtime(RustTool):
     """)
 
     project_name = "cargo-mtime"
-    default_version = "0.1.0"
+    default_version = "0.1.1"
 
     enabled = BoolOption(
         default=True,
