@@ -19,6 +19,9 @@ from pants_cargo_porcelain.goals.generate_lockfiles import (
 )
 from pants_cargo_porcelain.goals.generate_lockfiles import rules as generate_lockfiles_rules
 from pants_cargo_porcelain.target_generator import rules as target_generator_rules
+from pants_cargo_porcelain.tool import rules as tool_rules
+from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
+from pants_cargo_porcelain.tools.mtime import rules as mtime_rules
 from pants_cargo_porcelain.util_rules import cargo, dependency_inference, rustup, workspace
 from pants_cargo_porcelain.util_rules.sandbox import rules as sandbox_rules
 
@@ -39,6 +42,9 @@ def rule_runner() -> RuleRunner:
             *goal_rules(),
             *sandbox_rules(),
             *target_generator_rules(),
+            *tool_rules(),
+            *tool_rules_rules(),
+            *mtime_rules(),
             QueryRule(GenerateLockfileResult, [GenerateCargoPackageLockfileRequest]),
             QueryRule(GenerateLockfileResult, [GenerateCargoWorkspaceLockfileRequest]),
         ],

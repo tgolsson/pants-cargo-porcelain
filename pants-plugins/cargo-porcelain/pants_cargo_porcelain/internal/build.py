@@ -7,9 +7,13 @@ from pants.engine.internals.selectors import Get, MultiGet
 from pants.engine.platform import Platform
 from pants.engine.process import ProcessResult
 from pants.engine.rules import collect_rules, rule
+from pants.util.frozendict import FrozenDict
 
+from pants_cargo_porcelain.internal.platform import platform_to_target
 from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import CargoPackageSourcesField
+from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
+from pants_cargo_porcelain.tools.mtime import CargoMtime
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
 from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
@@ -29,26 +33,19 @@ class CargoBinaryRequest:
     release_mode: bool = False
 
 
-def platform_to_target(platform: Platform):
-    if platform == Platform.linux_x86_64:
-        return "x86_64-unknown-linux-gnu"
-    elif platform == Platform.linux_arm64:
-        return "aarch64-unknown-linux-gnu"
-    elif platform == Platform.macos_x86_64:
-        return "x86_64-apple-darwin"
-    elif platform == Platform.macos_arm64:
-        return "aarch64-apple-darwin"
-    else:
-        raise Exception("Unknown platform")
-
-
 @rule
 async def build_cargo_binary(
     req: CargoBinaryRequest,
     rust: RustSubsystem,
     rustup: RustupTool,
+    sccache: Sccache,
+    mtime: CargoMtime,
     platform: Platform,
 ) -> CargoBinary:
+    immutable_input_digests = {}
+    env = {}
+    extra_args = []
+    append_only_caches = {}
     source_files, toolchain = await MultiGet(
         Get(
             SourceFiles,
@@ -64,7 +61,14 @@ async def build_cargo_binary(
         ),
     )
 
-    extra_args = []
+    if sccache.enabled:
+        sccache_tool = await Get(InstalledRustTool, RustToolRequest, sccache.as_tool_request())
+
+        immutable_input_digests[".sccache"] = sccache_tool.digest
+        env["RUSTC_WRAPPER"] = "{chroot}/.sccache/sccache"
+        env["SCCACHE_LOG"] = "debug"
+        append_only_caches["sccache"] = ".sccache-cache"
+
     if rust.release:
         extra_args.append("--release")
 
@@ -86,6 +90,9 @@ async def build_cargo_binary(
             source_files.snapshot.digest,
             output_files=(f"{{cache_path}}/{build_level}/{req.binary_name}",),
             cache_path=req.address.spec_path,
+            immutable_input_digests=FrozenDict(immutable_input_digests),
+            env=FrozenDict(env),
+            append_only_caches=FrozenDict(append_only_caches),
         ),
     )
 

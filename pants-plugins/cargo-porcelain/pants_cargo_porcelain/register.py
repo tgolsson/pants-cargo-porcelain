@@ -1,7 +1,9 @@
 from . import subsystems, target_generator
 from . import target_types as tt
+from . import tool, tool_rules
 from .goals import fmt, generate_lockfiles, package, run, tailor, test
 from .internal import build
+from .tools import binstall, mtime
 from .util_rules import cargo, dependency_inference, rustup, sandbox, workspace
 
 
@@ -23,6 +25,10 @@ def rules():
         *target_generator.rules(),
         *workspace.rules(),
         *generate_lockfiles.rules(),
+        *tool_rules.rules(),
+        *tool.rules(),
+        *binstall.rules(),
+        *mtime.rules(),
     ]
 
 
