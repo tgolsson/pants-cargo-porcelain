@@ -17,8 +17,8 @@ python_requirement(
 )
 
 name_to_constraint = {
-    "pants-current": ">2.18.0a0,<2.19.0",
-    "pants-next": "==2.19.0.dev0",
+    "pants-current": ">2.21.0a0,<2.22.0",
+    "pants-next": "==2.22.0.dev0",
 }
 
 for name, constraint in name_to_constraint.items():
