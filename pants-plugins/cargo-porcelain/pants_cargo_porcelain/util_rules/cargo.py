@@ -4,7 +4,6 @@ import os
 from dataclasses import dataclass
 
 from pants.core.util_rules.system_binaries import (
-    SEARCH_PATHS,
     BashBinary,
     BinaryPath,
     BinaryPathRequest,
@@ -12,6 +11,7 @@ from pants.core.util_rules.system_binaries import (
     BinaryPathTest,
     BinaryShims,
     BinaryShimsRequest,
+    SystemBinariesSubsystem,
 )
 from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
 from pants.engine.process import Process
@@ -56,9 +56,9 @@ class CCBinary(BinaryPath):
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_cc() -> CCBinary:
+async def find_cc(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CCBinary:
     request = BinaryPathRequest(
-        binary_name="cc", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="cc", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
@@ -70,9 +70,9 @@ class LDBinary(BinaryPath):
 
 
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_ld() -> LDBinary:
+async def find_ld(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LDBinary:
     request = BinaryPathRequest(
-        binary_name="ld", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="ld", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
@@ -84,9 +84,9 @@ class RealpathBinary(BinaryPath):
 
 
 @rule(desc="Finding the `realpath` binary", level=LogLevel.DEBUG)
-async def find_realpath() -> RealpathBinary:
+async def find_realpath(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> RealpathBinary:
     request = BinaryPathRequest(
-        binary_name="realpath", search_path=SEARCH_PATHS, test=BinaryPathTest(args=["-v"])
+        binary_name="realpath", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="resolve named caches")
@@ -100,6 +100,7 @@ async def make_cargo_process(
     ld: LDBinary,
     bash: BashBinary,
     mtime: CargoMtime,
+    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
 ) -> Process:
     binary_shims = await Get(
         BinaryShims,
@@ -111,7 +112,7 @@ async def make_cargo_process(
             "ar",
             "realpath",
             rationale="rustc",
-            search_path=SEARCH_PATHS,
+            search_path=system_binaries_environment.system_binary_paths,
         ),
     )
 

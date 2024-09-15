@@ -113,7 +113,7 @@ async def cargo_test(
         return TestResult.no_tests_found(request.elements[0].address, ShowOutput.FAILED)
 
     return TestResult.from_fallible_process_result(
-        process_result, request.elements[0].address, ShowOutput.FAILED
+        (process_result,), request.elements[0].address, ShowOutput.FAILED
     )
 
 
