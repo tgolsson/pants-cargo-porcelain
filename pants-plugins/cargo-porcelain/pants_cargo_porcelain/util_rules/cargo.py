@@ -58,7 +58,9 @@ class CCBinary(BinaryPath):
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_cc(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CCBinary:
     request = BinaryPathRequest(
-        binary_name="cc", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
+        binary_name="cc",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["-v"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
@@ -72,7 +74,9 @@ class LDBinary(BinaryPath):
 @rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
 async def find_ld(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LDBinary:
     request = BinaryPathRequest(
-        binary_name="ld", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
+        binary_name="ld",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["-v"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
@@ -84,9 +88,13 @@ class RealpathBinary(BinaryPath):
 
 
 @rule(desc="Finding the `realpath` binary", level=LogLevel.DEBUG)
-async def find_realpath(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> RealpathBinary:
+async def find_realpath(
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
+) -> RealpathBinary:
     request = BinaryPathRequest(
-        binary_name="realpath", search_path=system_binaries.system_binary_paths, test=BinaryPathTest(args=["-v"])
+        binary_name="realpath",
+        search_path=system_binaries.system_binary_paths,
+        test=BinaryPathTest(args=["-v"]),
     )
     paths = await Get(BinaryPaths, BinaryPathRequest, request)
     first_path = paths.first_path_or_raise(request, rationale="resolve named caches")
