@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from pants.core.target_types import FileSourceField
 from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
 from pants.engine.addresses import Address
 from pants.engine.rules import Get, collect_rules, rule
@@ -22,6 +23,8 @@ async def cargo_sources(request: CargoSourcesRequest) -> SourceFiles:
 
     source_fields = []
     for tgt in all_targets.closure:
+        if tgt.has_field(FileSourceField):
+            source_fields.append(tgt[FileSourceField])
         if tgt.has_field(CargoPackageSourcesField):
             source_fields.append(tgt[CargoPackageSourcesField])
         elif tgt.has_field(CargoWorkspaceSourcesField):
