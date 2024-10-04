@@ -67,6 +67,7 @@ jobs:
 
     - name: Package all targets
       run: |
+        set -euxo
         ./.github/get-pants.sh
         /home/runner/bin/pants package ::
         [[ $(dist/examples.hello-world/hello-world) = "Hello, world!" ]] || exit 1
