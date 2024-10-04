@@ -69,6 +69,7 @@ jobs:
       run: |
         ./.github/get-pants.sh
         /home/runner/bin/pants package ::
+        [[ $(dist/examples.hello-world/hello-world) = "Hello, world!" ]] || exit 1
 
   check-and-lint:
     runs-on: ubuntu-20.04
