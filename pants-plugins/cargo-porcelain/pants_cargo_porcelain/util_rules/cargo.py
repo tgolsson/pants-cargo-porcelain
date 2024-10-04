@@ -162,7 +162,7 @@ async def make_cargo_process(
 
     copy_files = []
     new_output_files = []
-    for file in req.output_files:
+    for file in output_files:
         if "cargo-target-cache" not in file:
             new_output_files.append(file)
             continue
