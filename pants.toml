@@ -4,6 +4,7 @@ pants_version = "2.21.1"
 pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 
 backend_packages = [
+  "pants.backend.docker",
   "pants.backend.experimental.python",
   "pants.backend.experimental.python.lint.ruff",
   "pants.backend.plugin_development",
@@ -80,3 +81,21 @@ enabled = true
 
 [binstall]
 enable = true
+
+
+[environments-preview.names]
+cross-compiler="//examples/docker-cross-compile:cross-compiler-env"
+
+[docker]
+# Set up docker to use osxkeychain
+env_vars = ["DOCKER_CONFIG=%(homedir)s/.docker"]
+tools = [
+  "docker-credential-osxkeychain",
+  "dirname",
+  "readlink",
+  "python3",
+  # These may be necessary if using Pyenv-installed Python.
+  "cut",
+  "sed",
+  "bash",
+]
