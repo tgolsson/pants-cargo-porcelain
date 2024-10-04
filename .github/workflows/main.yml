@@ -62,7 +62,7 @@ jobs:
     - name: Initialize Pants
       uses: pantsbuild/actions/init-pants@main
       with:
-        gha-cache-key: cache1-package-py3.9-pants${{ matrix.pants-version }}
+        gha-cache-key: cache2-package-py3.9-pants${{ matrix.pants-version }}
         named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
 
     - name: Package all targets
