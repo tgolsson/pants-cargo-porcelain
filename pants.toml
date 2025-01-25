@@ -21,7 +21,6 @@ backend_packages = [
 
 pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
 
-
 [python]
 tailor_pex_binary_targets = true
 interpreter_constraints = ["==3.9.*"]
