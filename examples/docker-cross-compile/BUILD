@@ -2,11 +2,13 @@ docker_image(
     name = "cross-compiler",
     dependencies = [":cargo-lock"],
     source = "Dockerfile",
+    skip_push = True,
+    repository = "example/rust-cross-compiler",
 )
 
 docker_environment(
     name = "cross-compiler-env",
-    image = "cross-compiler",
+    image = "example/rust-cross-compiler",
 )
 
 cargo_package(
