@@ -1,4 +1,4 @@
-![Pants](https://img.shields.io/badge/Pants-2.18.0-%2355acee)
+![Pants](https://img.shields.io/badge/Pants-2.24.1-%2355acee)
 
 # Cargo porcelain for Pants
 

@@ -1,11 +1,11 @@
 [GLOBAL]
-pants_version = "2.21.1"
+pants_version = "2.24.1"
 
 pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 
 backend_packages = [
   "pants.backend.experimental.python",
-  "pants.backend.experimental.python.lint.ruff",
+  "pants.backend.experimental.python.lint.ruff.check",
   "pants.backend.plugin_development",
   "pants.backend.python",
   "pants.backend.python.lint.black",

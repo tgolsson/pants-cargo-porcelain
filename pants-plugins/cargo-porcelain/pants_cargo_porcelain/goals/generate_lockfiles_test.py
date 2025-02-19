@@ -51,7 +51,9 @@ def rule_runner() -> RuleRunner:
         target_types=register.target_types(),
         preserve_tmpdirs=True,
     )
-    rule_runner.set_options(["--keep-sandboxes=always"], env_inherit={"PATH"})
+    rule_runner.set_options(
+        ["--keep-sandboxes=always", "--rustup-rust-version=1.72.1"], env_inherit={"PATH"}
+    )
     return rule_runner
 
 
