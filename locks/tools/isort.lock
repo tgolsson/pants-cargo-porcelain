@@ -24,6 +24,7 @@
   "allow_wheels": true,
   "build_isolation": true,
   "constraints": [],
+  "excluded": [],
   "locked_resolves": [
     {
       "locked_requirements": [
@@ -71,9 +72,10 @@
   ],
   "only_builds": [],
   "only_wheels": [],
+  "overridden": [],
   "path_mappings": {},
-  "pex_version": "2.3.1",
-  "pip_version": "24.0",
+  "pex_version": "2.20.3",
+  "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
     "isort[colors,pyproject]<6.0,>=5.9.3"
@@ -88,5 +90,6 @@
     "mac"
   ],
   "transitive": true,
-  "use_pep517": null
+  "use_pep517": null,
+  "use_system_time": false
 }
