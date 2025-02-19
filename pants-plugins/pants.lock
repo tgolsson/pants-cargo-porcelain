@@ -9,8 +9,8 @@
 //     "CPython==3.9.*"
 //   ],
 //   "generated_with_requirements": [
-//     "pantsbuild.pants.testutil==2.24.0",
-//     "pantsbuild.pants==2.24.0",
+//     "pantsbuild.pants.testutil==2.24.1",
+//     "pantsbuild.pants==2.24.1",
 //     "pytest-cov!=2.12.1,<3.1,>=2.12",
 //     "pytest-xdist<3,>=2.5",
 //     "pytest==7.0.*",
@@ -437,23 +437,23 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "6a01c7f78a4c1cc89ed6df0b3196842a9818e26030626d1796ea02b8d806c365",
-              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.0/pantsbuild.pants-2.24.0-cp39-cp39-manylinux2014_x86_64.whl"
+              "hash": "b964572e611e834e540e1e32ecdf56ee5a4d6a0e83f34bb6a5761ce835078ee1",
+              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.1/pantsbuild.pants-2.24.1-cp39-cp39-manylinux2014_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "3f3fcc0c30589eb7c662f416d986bff2d6360285457afaec5cba3ce94cc57e55",
-              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.0/pantsbuild.pants-2.24.0-cp39-cp39-macosx_10_15_x86_64.whl"
+              "hash": "1c8a2e9cb63340abca81d37f01e1ea4fd8e49cb5e91cf634eb2084cdffc8a6c2",
+              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.1/pantsbuild.pants-2.24.1-cp39-cp39-macosx_10_15_x86_64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e540a36380da2e4d16571e13ce57f83d5948b1ba4f936bae308aa75376b1523b",
-              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.0/pantsbuild.pants-2.24.0-cp39-cp39-macosx_11_0_arm64.whl"
+              "hash": "726fe7f46317d1118f82e43e0262697b680b686e238d8a8f75fec2e51a1e35d0",
+              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.1/pantsbuild.pants-2.24.1-cp39-cp39-macosx_11_0_arm64.whl"
             },
             {
               "algorithm": "sha256",
-              "hash": "e0076fdb8e14809f5e5b986ee3794f46a478616a38e8230aa3f6eac9002b2086",
-              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.0/pantsbuild.pants-2.24.0-cp39-cp39-manylinux2014_aarch64.whl"
+              "hash": "2dd6dbe84a9d2e410dbd5f59db675410126d0b6f1efa2b351ad0edb0315eb7ce",
+              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.1/pantsbuild.pants-2.24.1-cp39-cp39-manylinux2014_aarch64.whl"
             }
           ],
           "project_name": "pantsbuild-pants",
@@ -477,23 +477,23 @@
             "typing-extensions~=4.12"
           ],
           "requires_python": "==3.9.*",
-          "version": "2.24.0"
+          "version": "2.24.1"
         },
         {
           "artifacts": [
             {
               "algorithm": "sha256",
-              "hash": "34afb9a60c66a094feacd5f10b82f01e3eb10b5be5d59f1e39c038f6c15ba0c4",
-              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.0/pantsbuild.pants.testutil-2.24.0-py3-none-any.whl"
+              "hash": "f3fec4d76830907a3c5ca89aba051369572ea0aa9948b9e4c6a526e0df0de612",
+              "url": "https://github.com/pantsbuild/pants/releases/download/release_2.24.1/pantsbuild.pants.testutil-2.24.1-py3-none-any.whl"
             }
           ],
           "project_name": "pantsbuild-pants-testutil",
           "requires_dists": [
-            "pantsbuild.pants==2.24.0",
+            "pantsbuild.pants==2.24.1",
             "pytest<7.1.0,>=6.2.4"
           ],
           "requires_python": "==3.9.*",
-          "version": "2.24.0"
+          "version": "2.24.1"
         },
         {
           "artifacts": [
@@ -1137,8 +1137,8 @@
   "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
-    "pantsbuild.pants.testutil==2.24.0",
-    "pantsbuild.pants==2.24.0",
+    "pantsbuild.pants.testutil==2.24.1",
+    "pantsbuild.pants==2.24.1",
     "pytest-cov!=2.12.1,<3.1,>=2.12",
     "pytest-xdist<3,>=2.5",
     "pytest==7.0.*",
