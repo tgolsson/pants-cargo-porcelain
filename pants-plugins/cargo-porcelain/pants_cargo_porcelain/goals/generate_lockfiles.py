@@ -1,36 +1,35 @@
+"""`pants generate-lockfiles`: `cargo update` per workspace and per package outside any
+workspace. The resolve names are the addresses of workspaces and packages; a member package's
+name updates its workspace's lockfile, since that is the only lockfile cargo keeps for it."""
+
+from __future__ import annotations
+
+import os
 from dataclasses import dataclass
 
 from pants.core.goals.generate_lockfiles import (
     GenerateLockfile,
     GenerateLockfileResult,
-    GenerateLockfilesSubsystem,
     KnownUserResolveNames,
     KnownUserResolveNamesRequest,
     RequestedUserResolveNames,
     UserGenerateLockfiles,
-    WrappedGenerateLockfile,
 )
-from pants.core.util_rules.source_files import SourceFiles
+from pants.engine.addresses import Address
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
+from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
 
-from pants_cargo_porcelain.internal.build import platform_to_target
-from pants_cargo_porcelain.subsystems import RustupTool
-from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
-from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
-from pants_cargo_porcelain.util_rules.workspace import (
-    AllCargoTargets,
-    assign_packages_to_workspaces,
+from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
+from pants_cargo_porcelain.util_rules.rustup import (
+    RustToolchainRequest,
+    RustVersion,
+    install_rust_toolchain,
+    platform_triple,
 )
-
-
-class CargoLock(GenerateLockfilesSubsystem):
-    name = "cargo-lock"
-    help = "Update Cargo.lock files."
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
+from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
 
 class RequestedCargoUserResolveNames(RequestedUserResolveNames):
@@ -42,158 +41,79 @@ class KnownCargoUserResolveNamesRequest(KnownUserResolveNamesRequest):
 
 
 @rule
-async def determine_rust_user_resolves(
-    _: KnownCargoUserResolveNamesRequest,
-    cargo_targets: AllCargoTargets,
+async def determine_cargo_user_resolves(
+    _: KnownCargoUserResolveNamesRequest, all_targets: AllCargoTargets
 ) -> KnownUserResolveNames:
-    mapping = await assign_packages_to_workspaces(cargo_targets)
-
-    names = [str(ws) for ws in mapping.workspace_to_packages]
-
-    names.extend(str(p.address) for p in mapping.loose_packages)
-
+    # No environment is in scope here, so the workspace mapping (which reads manifests)
+    # cannot be computed; every workspace and package is a name, mapped below.
+    names = sorted(str(t.address) for t in (*all_targets.workspaces, *all_targets.packages))
     return KnownUserResolveNames(
-        names=sorted(names),
-        option_name=None,
+        names=tuple(names),
+        option_name="",
         requested_resolve_names_cls=RequestedCargoUserResolveNames,
     )
 
 
 @dataclass(frozen=True)
-class GenerateCargoWorkspaceLockfileRequest(GenerateLockfile):
-    workspace: CargoWorkspaceTarget
+class GenerateCargoLockfileRequest(GenerateLockfile):
+    root: Address
 
 
-@dataclass(frozen=True)
-class GenerateCargoPackageLockfileRequest(GenerateLockfile):
-    package: CargoPackageTarget
-
-
-@rule
-def wrap_package_lockfile_request(
-    request: GenerateCargoPackageLockfileRequest,
-) -> WrappedGenerateLockfile:
-    return WrappedGenerateLockfile(request)
-
-
-@rule
-def wrap_workspace_lockfile_request(
-    request: GenerateCargoWorkspaceLockfileRequest,
-) -> WrappedGenerateLockfile:
-    return WrappedGenerateLockfile(request)
-
-
-@rule
-async def generate_rust_workspace_lockfile(
-    req: GenerateCargoWorkspaceLockfileRequest,
-    rustup: RustupTool,
-    platform: Platform,
+@rule(desc="Generate a Cargo.lock")
+async def generate_cargo_lockfile(
+    request: GenerateCargoLockfileRequest, version: RustVersion, platform: Platform
 ) -> GenerateLockfileResult:
-    toolchain = await Get(
-        RustToolchain,
-        RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
+    toolchain = await install_rust_toolchain(
+        RustToolchainRequest(version.version, platform_triple(platform), version.components)
     )
-
-    source_files = await Get(SourceFiles, CargoSourcesRequest(frozenset([req.workspace.address])))
-
-    cargo_toml_path = f"{req.workspace.address.spec_path}/Cargo.toml"
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            (
-                "update",
-                "--color=always",
-                f"--manifest-path={cargo_toml_path}",
-            ),
-            source_files.snapshot.digest,
-            output_files=(f"{req.workspace.address.spec_path}/Cargo.lock",),
-            description=f"Generate lockfile for {req.workspace.address}",
-        ),
+    sources = await cargo_sources(
+        CargoSourcesRequest(frozenset([request.root]), include_packages=False)
     )
-
-    return GenerateLockfileResult(
-        process_result.output_digest,
-        str(req.workspace.address),
-        f"{req.workspace.address.spec_path}/Cargo.lock",
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CargoProcessRequest(
+                toolchain,
+                ("update", f"--manifest-path={manifest_path(request.root.spec_path)}"),
+                description=f"cargo update {request.root}",
+                digest=sources.digest,
+                output_files=(request.lockfile_dest,),
+                # The registry moves on: a cached `cargo update` would return an old lockfile.
+                cache_scope=ProcessCacheScope.PER_SESSION,
+            )
+        )
     )
+    return GenerateLockfileResult(result.output_digest, request.resolve_name, request.lockfile_dest)
 
 
 @rule
-async def generate_rust_package_lockfile(
-    req: GenerateCargoPackageLockfileRequest,
-    rustup: RustupTool,
-    platform: Platform,
-) -> GenerateLockfileResult:
-    toolchain, source_files = await MultiGet(
-        Get(
-            RustToolchain,
-            RustToolchainRequest(rustup.rust_version, platform_to_target(platform), ("cargo",)),
-        ),
-        Get(SourceFiles, CargoSourcesRequest(frozenset([req.package.address]))),
-    )
-
-    cargo_toml_path = f"{req.package.address.spec_path}/Cargo.toml"
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            (
-                "update",
-                "--color=always",
-                f"--manifest-path={cargo_toml_path}",
-            ),
-            source_files.snapshot.digest,
-            output_files=(f"{req.package.address.spec_path}/Cargo.lock",),
-        ),
-    )
-
-    return GenerateLockfileResult(
-        process_result.output_digest,
-        str(req.package.address),
-        f"{req.package.address.spec_path}/Cargo.lock",
-    )
-
-
-@rule
-async def setup_user_lockfile_requests(
+async def setup_cargo_lockfile_requests(
     requested: RequestedCargoUserResolveNames,
     all_targets: AllCargoTargets,
+    mapping: CargoPackageMapping,
 ) -> UserGenerateLockfiles:
-    packages = []
-    workspaces = []
-
-    for resolve in requested:
-        for package in all_targets.packages:
-            if str(package.address) == resolve:
-                packages.append(
-                    GenerateCargoPackageLockfileRequest(
-                        package=package,
-                        resolve_name=resolve,
-                        lockfile_dest=f"{package.address.spec_path}/Cargo.lock",
-                        diff=True,
-                    )
-                )
-
-        for workspace in all_targets.workspaces:
-            if str(workspace.address) == resolve:
-                workspaces.append(
-                    GenerateCargoWorkspaceLockfileRequest(
-                        workspace=workspace,
-                        resolve_name=resolve,
-                        lockfile_dest=f"{package.address.spec_path}/Cargo.lock",
-                        diff=True,
-                    ),
-                )
-
-    return UserGenerateLockfiles(packages + workspaces)
+    by_name = {str(t.address): t.address for t in (*all_targets.workspaces, *all_targets.packages)}
+    roots: dict[Address, str] = {}
+    for name in requested:
+        address = by_name.get(name)
+        if address is None:
+            raise ValueError(f"`{name}` is not a cargo workspace or package address")
+        root = mapping.workspace_for(address) or address
+        roots.setdefault(root, str(root))
+    return UserGenerateLockfiles(
+        GenerateCargoLockfileRequest(
+            root=root,
+            resolve_name=name,
+            lockfile_dest=os.path.join(root.spec_path, "Cargo.lock"),
+            diff=False,
+        )
+        for root, name in roots.items()
+    )
 
 
 def rules():
     return (
-        *collect_rules(),  #
+        *collect_rules(),
         UnionRule(KnownUserResolveNamesRequest, KnownCargoUserResolveNamesRequest),
         UnionRule(RequestedUserResolveNames, RequestedCargoUserResolveNames),
-        UnionRule(GenerateLockfile, GenerateCargoPackageLockfileRequest),
-        UnionRule(GenerateLockfile, GenerateCargoWorkspaceLockfileRequest),
+        UnionRule(GenerateLockfile, GenerateCargoLockfileRequest),
     )

@@ -1,179 +1,185 @@
+"""The Rust toolchain. rustup-init (a pinned download) installs an exact version into named
+caches for `RUSTUP_HOME` and `CARGO_HOME`, shared by every sandbox and every session; nothing
+from the host's `~/.rustup` or `~/.cargo` is used. The version comes from `[rustup].rust_version`
+or the `rust-toolchain.toml` at the build root."""
+
+from __future__ import annotations
+
 import fcntl
 import os
-import time
+import re
+import tomllib
 from dataclasses import dataclass
 
 from pants.base.build_environment import get_pants_cachedir
-from pants.core.util_rules.external_tool import DownloadedExternalTool, ExternalToolRequest
-from pants.engine.fs import EMPTY_DIGEST
+from pants.core.util_rules.external_tool import download_external_tool
+from pants.engine.fs import PathGlobs
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.platform import Platform
-from pants.engine.process import Process, ProcessResult
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.subsystems import RustupTool
+from pants_cargo_porcelain.subsystems import PLATFORM_TRIPLES, RustupTool
 
-RUSTUP_NAMED_CACHE = ".rustup"
-RUSTUP_APPEND_ONLY_CACHES = FrozenDict({"rustup": RUSTUP_NAMED_CACHE})
+RUSTUP_NAMED_CACHE = ".rustup-home"
+CARGO_NAMED_CACHE = ".cargo-home"
+TOOLCHAIN_CACHES = FrozenDict({"rustup": RUSTUP_NAMED_CACHE, "cargo": CARGO_NAMED_CACHE})
+TOOLCHAIN_FILE = "rust-toolchain.toml"
 
-CARGO_NAMED_CACHE = ".cargo"
-CARGO_APPEND_ONLY_CACHES = FrozenDict({"cargo": CARGO_NAMED_CACHE})
+_EXACT_VERSION = re.compile(r"^\d+\.\d+\.\d+$|^nightly-\d{4}-\d{2}-\d{2}$")
 
-BOTH_CACHES = FrozenDict({**RUSTUP_APPEND_ONLY_CACHES, **CARGO_APPEND_ONLY_CACHES})
+_TOOLCHAIN_ENV = FrozenDict({
+    "RUSTUP_HOME": f"{{chroot}}/{RUSTUP_NAMED_CACHE}",
+    "CARGO_HOME": f"{{chroot}}/{CARGO_NAMED_CACHE}",
+})
+
+
+@dataclass(frozen=True)
+class RustVersion:
+    """The toolchain to install: an exact version and the components `rust-toolchain.toml`
+    asks for, plus clippy and rustfmt for `lint` and `fmt`."""
+
+    version: str
+    components: tuple[str, ...]
+
+
+@rule(desc="Determine the Rust version", level=LogLevel.DEBUG)
+async def determine_rust_version(rustup: RustupTool) -> RustVersion:
+    contents = await get_digest_contents(await path_globs_to_digest(PathGlobs([TOOLCHAIN_FILE])))
+    channel: str | None = None
+    components: tuple[str, ...] = ()
+    if contents:
+        toolchain = tomllib.loads(contents[0].content.decode()).get("toolchain", {})
+        channel = toolchain.get("channel")
+        components = tuple(toolchain.get("components", ()))
+
+    # One toolchain request per session, whatever the goal: a second `rustup` run while a
+    # cargo process executes a proxy in CARGO_HOME/bin fails with "text file busy".
+    for component in ("clippy", "rustfmt"):
+        if component not in components:
+            components = (*components, component)
+
+    version = rustup.rust_version or channel
+    if not version:
+        raise ValueError(
+            f"No Rust version: set `[rustup].rust_version`, or add a `{TOOLCHAIN_FILE}` with "
+            '`[toolchain] channel = "<version>"` at the build root.'
+        )
+    if not _EXACT_VERSION.match(version):
+        raise ValueError(
+            f"The Rust version must be exact (`1.97.0`, `nightly-2026-01-31`), not `{version}`: "
+            "the toolchain is part of every cache key."
+        )
+    return RustVersion(version, components)
 
 
 @dataclass(frozen=True)
 class RustToolchainRequest:
     version: str
     target: str
-    components: tuple[str, ...]
-
-    def __str__(self) -> str:
-        return f"rust-{self.version}-{self.target}"
+    components: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
 class RustToolchain:
+    """An installed toolchain, as a sandbox-relative path into the rustup named cache."""
+
     path: str
     version: str
     target: str
 
-    ok: bool
+    @property
+    def bin_dir(self) -> str:
+        return f"{self.path}/bin"
 
     @property
     def cargo(self) -> str:
-        return f"{self.path}/bin/cargo"
+        return f"{self.bin_dir}/cargo"
 
 
-@dataclass(frozen=True)
-class RustupBinary:
-    path: str
+class _FileLock:
+    """Serialises toolchain installs across Pants sessions: the engine runs one install per
+    request per session, but two sessions on one machine share the named cache."""
 
-
-@dataclass(frozen=True)
-class RustupBinaryRequest:
-    pass
-
-
-@rule(desc="Get RustUp", level=LogLevel.DEBUG)
-async def get_rustup_binary(
-    req: RustupBinaryRequest, rustup: RustupTool, platform: Platform
-) -> RustupBinary:
-    rustup_tool = await Get(
-        DownloadedExternalTool, ExternalToolRequest, rustup.get_request(platform)
-    )
-    _ = await Get(
-        ProcessResult,
-        Process(
-            argv=[rustup_tool.exe, "--no-update-default-toolchain", "--no-modify-path", "-y"],
-            input_digest=rustup_tool.digest,
-            description="Installing Rustup",
-            level=LogLevel.DEBUG,
-            append_only_caches=BOTH_CACHES,
-            env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-        ),
-    )
-
-    return RustupBinary(path=f"{CARGO_NAMED_CACHE}/bin/rustup")
-
-
-class FileLock:
     def __init__(self, path: str):
-        directory = os.path.dirname(path)
-        if directory:
-            os.makedirs(directory, exist_ok=True)
-
-        open_mode = os.O_RDWR | os.O_CREAT | os.O_TRUNC
-        fd = os.open(path, open_mode)
-        self._fd = fd
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        self._fd = os.open(path, os.O_RDWR | os.O_CREAT)
 
     def __enter__(self):
         fcntl.flock(self._fd, fcntl.LOCK_EX)
         return self
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self._fd:
-            fcntl.flock(self._fd, fcntl.LOCK_UN)
-            os.close(self._fd)
-
-        self._fd = None
+    def __exit__(self, *exc):
+        fcntl.flock(self._fd, fcntl.LOCK_UN)
+        os.close(self._fd)
 
 
-@rule(desc="Get Rust toolchain", level=LogLevel.DEBUG)
-async def get_rust_toolchain(request: RustToolchainRequest) -> RustToolchain:
-    rustup_binary = await Get(RustupBinary, RustupBinaryRequest())
+@rule(desc="Install the Rust toolchain", level=LogLevel.DEBUG)
+async def install_rust_toolchain(
+    request: RustToolchainRequest, rustup: RustupTool, platform: Platform
+) -> RustToolchain:
+    rustup_init = await download_external_tool(rustup.get_request(platform))
+    components = [f"--component={c}" for c in request.components]
 
-    lock_file_path = os.path.join(get_pants_cachedir(), "locks", ".rustup")
-    with FileLock(lock_file_path):
-        time.sleep(0.1)
-        _ = await Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    rustup_binary.path,
-                    "toolchain",
-                    "install",
-                    "--no-self-update",
-                    request.version,
-                ],
-                input_digest=EMPTY_DIGEST,
-                description=f"Installing Rust {request.version}",
-                level=LogLevel.DEBUG,
-                append_only_caches=BOTH_CACHES,
-                env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-            ),
-        )
-        time.sleep(0.1)
-        _ = await Get(
-            ProcessResult,
-            Process(
-                argv=[
-                    rustup_binary.path,
-                    "target",
-                    "add",
-                    f"--toolchain={request.version}",
-                    request.target,
-                ],
-                input_digest=EMPTY_DIGEST,
-                description=f"Installing target {request.target} for toolchain {request.version}",
-                level=LogLevel.DEBUG,
-                append_only_caches=BOTH_CACHES,
-                env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-            ),
-        )
-        time.sleep(0.1)
-        if request.components:
-            _ = await Get(
-                ProcessResult,
+    # rustup is idempotent and quick when everything is installed, so these run once per
+    # session rather than being memoised forever: a process-cache hit must not be able to
+    # claim a toolchain that a wiped named cache no longer holds.
+    with _FileLock(os.path.join(get_pants_cachedir(), "locks", "rustup")):
+        await fallible_to_exec_result_or_raise(
+            **implicitly(
                 Process(
                     argv=[
-                        rustup_binary.path,
-                        "component",
-                        "add",
-                        f"--toolchain={request.version}",
-                        *request.components,
+                        rustup_init.exe,
+                        "-y",
+                        "--no-modify-path",
+                        "--no-update-default-toolchain",
+                        "--default-toolchain=none",
+                        "--profile=minimal",
                     ],
-                    input_digest=EMPTY_DIGEST,
-                    description=(
-                        f"Installing components {request.components} for toolchain"
-                        f" {request.version}"
-                    ),
+                    input_digest=rustup_init.digest,
+                    description="Install rustup",
                     level=LogLevel.DEBUG,
-                    append_only_caches=BOTH_CACHES,
-                    env={"RUSTUP_HOME": RUSTUP_NAMED_CACHE, "CARGO_HOME": CARGO_NAMED_CACHE},
-                ),
+                    append_only_caches=TOOLCHAIN_CACHES,
+                    env=_TOOLCHAIN_ENV,
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                )
             )
-
-        return RustToolchain(
-            path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}-{request.target}",
-            version=request.version,
-            target=request.target,
-            ok=True,
         )
+        await fallible_to_exec_result_or_raise(
+            **implicitly(
+                Process(
+                    argv=[
+                        f"{{chroot}}/{CARGO_NAMED_CACHE}/bin/rustup",
+                        "toolchain",
+                        "install",
+                        request.version,
+                        "--no-self-update",
+                        "--profile=minimal",
+                        f"--target={request.target}",
+                        *components,
+                    ],
+                    description=f"Install Rust {request.version} for {request.target}",
+                    level=LogLevel.DEBUG,
+                    append_only_caches=TOOLCHAIN_CACHES,
+                    env=_TOOLCHAIN_ENV,
+                    cache_scope=ProcessCacheScope.PER_SESSION,
+                )
+            )
+        )
+
+    host = platform_triple(platform)
+    return RustToolchain(
+        path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}-{host}",
+        version=request.version,
+        target=request.target,
+    )
+
+
+def platform_triple(platform: Platform) -> str:
+    return PLATFORM_TRIPLES[platform.value]
 
 
 def rules():
-    return [
-        *collect_rules(),
-    ]
+    return collect_rules()

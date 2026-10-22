@@ -9,32 +9,27 @@ on:
 permissions:
   contents: read
 
+# Pants 2.33 runs on CPython 3.14; the plugin tests get theirs from the
+# python_build_standalone provider (pants.toml), so no system Python is set up.
+
 jobs:
   test:
     strategy:
       matrix:
-        pants-version: ["2.24.1"]
-        platform: ["macos-13", "ubuntu-latest"]
+        pants-version: ["2.33.1"]
+        platform: ["macos-14", "ubuntu-latest"]
         shard: [0, 1, 2]
 
     runs-on: "${{ matrix.platform }}"
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
-      with:
-        python-version: 3.9
-
-    - name: Tell Pants to use Python 3.9
-      run: |
-        echo "PANTS_PYTHON_INTERPRETER_CONSTRAINTS=['==3.9.*']" >> $GITHUB_ENV
+    - uses: actions/checkout@v4
 
     - name: Initialize Pants
       uses: pantsbuild/actions/init-pants@main
       with:
         # cache0 makes it easy to bust the cache if needed
-        gha-cache-key: cache1-test-py3.9-pants${{ matrix.pants-version }}-${{ matrix.platform }}-${{ matrix.shard }}
+        gha-cache-key: cache2-test-pants${{ matrix.pants-version }}-${{ matrix.platform }}-${{ matrix.shard }}
         named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
 
     - name: Test everything
@@ -42,65 +37,58 @@ jobs:
         pants test --shard="${{ matrix.shard }}/3" ::
 
   package:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        pants-version: ["2.24.0"]
+        pants-version: ["2.33.1"]
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
-      with:
-        python-version: 3.9
-
-    - name: Tell Pants to use Python 3.9
-      run: |
-        echo "PANTS_VERSION=${{ matrix.pants-version }}" >> $GITHUB_ENV
+    - uses: actions/checkout@v4
 
     - name: Initialize Pants
       uses: pantsbuild/actions/init-pants@main
       with:
-        gha-cache-key: cache2-package-py3.9-pants${{ matrix.pants-version }}
+        gha-cache-key: cache3-package-pants${{ matrix.pants-version }}
         named-caches-hash: ${{ hashFiles('pants-plugins/**/*') }}
 
     - name: Package all targets
       run: |
         set -euxo
-        ./.github/get-pants.sh
-        /home/runner/bin/pants package ::
+        pants package ::
         [[ $(dist/examples.hello-world/hello-world) = "Hello, world!" ]] || exit 1
 
   check-and-lint:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
+    - uses: actions/checkout@v4
+
+    - name: Initialize Pants
+      uses: pantsbuild/actions/init-pants@main
       with:
-        python-version: 3.9
+        gha-cache-key: cache3-lint
+        named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
 
     - name: Run linters on all targets
       run: |
-        ./.github/get-pants.sh
-        /home/runner/bin/pants update-build-files --check lint ::
+        pants update-build-files --check lint ::
 
   validate-tailor:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v3
+    - uses: actions/checkout@v4
+
+    - name: Initialize Pants
+      uses: pantsbuild/actions/init-pants@main
       with:
-        python-version: 3.9
+        gha-cache-key: cache3-tailor
+        named-caches-hash: ${{ hashFiles('pants-plugins/*.lock') }}
 
     - name: Validate that tailor files are up to date
       run: |
-        ./.github/get-pants.sh
-        /home/runner/bin/pants tailor --check ::
+        pants tailor --check ::
 
   summarize:
     needs:
@@ -109,7 +97,7 @@ jobs:
     - validate-tailor
     - test
 
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: success()
 
     outputs:
@@ -119,7 +107,7 @@ jobs:
       run: echo "success=true" >> $GITHUB_OUTPUT
 
   ci:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     if: always() # always run, so we never skip the check
     needs:
     - summarize

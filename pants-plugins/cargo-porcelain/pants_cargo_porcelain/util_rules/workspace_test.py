@@ -1,26 +1,12 @@
-# Copyright 2021 Pants project contributors (see CONTRIBUTORS.md).
-# Licensed under the Apache License, Version 2.0 (see LICENSE).
-
 from __future__ import annotations
 
 import pytest
 from pants.build_graph.address import Address
-from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
 
-from pants_cargo_porcelain import subsystems, target_types
-from pants_cargo_porcelain.target_generator import rules as target_generator_rules
-from pants_cargo_porcelain.target_types import (
-    CargoPackageTarget,
-    CargoPackageTargetImpl,
-    CargoWorkspaceTarget,
-)
-from pants_cargo_porcelain.tool import rules as tool_rules
-from pants_cargo_porcelain.tool_rules import rules as tool_rules_rules
-from pants_cargo_porcelain.tools.mtime import rules as mtime_rules
-from pants_cargo_porcelain.util_rules import cargo, rustup, workspace
+from pants_cargo_porcelain.testing import make_rule_runner, package_fixture
 from pants_cargo_porcelain.util_rules.workspace import (
     AllCargoTargets,
     CargoPackageMapping,
@@ -30,106 +16,62 @@ from pants_cargo_porcelain.util_rules.workspace import (
 
 @pytest.fixture
 def rule_runner() -> RuleRunner:
-    rule_runner = RuleRunner(
-        rules=[
-            *subsystems.rules(),
-            *target_types.rules(),
-            *source_files.rules(),
-            *external_tool.rules(),
-            *cargo.rules(),
-            *rustup.rules(),
-            *workspace.rules(),
-            *target_generator_rules(),
-            *tool_rules(),
-            *tool_rules_rules(),
-            *mtime_rules(),
-            QueryRule(AllCargoTargets, []),
-            QueryRule(CargoPackageMapping, []),
-        ],
-        target_types=[CargoPackageTargetImpl, CargoWorkspaceTarget, CargoPackageTarget],
-    )
-    rule_runner.set_options([], env_inherit={"PATH"})
-    return rule_runner
+    return make_rule_runner([QueryRule(AllCargoTargets, []), QueryRule(CargoPackageMapping, [])])
 
 
 def test_find_package_targets(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({
-        "with_root/Cargo.toml": '[package]\nname="foobar"\nversion = "0.1.0"',
-        "with_root/BUILD": "cargo_package()",
-        "with_root/src/lib.rs": "",
-    })
-    rust_targets = rule_runner.request(AllCargoTargets, [])
-
-    package = rule_runner.get_target(
-        Address("with_root", target_name="with_root", generated_name="package")
-    )
-    assert rust_targets == AllCargoTargets(packages=(package,), workspaces=tuple())
+    rule_runner.write_files(package_fixture("foobar"))
+    targets = rule_runner.request(AllCargoTargets, [])
+    package = rule_runner.get_target(Address("foobar", generated_name="package"))
+    assert targets == AllCargoTargets(packages=(package,), workspaces=())
 
 
 def test_find_workspace_targets(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
-        "with_root/Cargo.toml": "[workspace]",
-        "with_root/BUILD": 'cargo_workspace(name="workspace")',
+        "ws/Cargo.toml": "[workspace]\nmembers = []\n",
+        "ws/BUILD": 'cargo_workspace(name="workspace")',
     })
-    rust_targets = rule_runner.request(AllCargoTargets, [])
+    targets = rule_runner.request(AllCargoTargets, [])
+    ws = rule_runner.get_target(Address("ws", target_name="workspace"))
+    assert targets == AllCargoTargets(packages=(), workspaces=(ws,))
 
-    ws = rule_runner.get_target(Address("with_root", target_name="workspace"))
-    assert rust_targets == AllCargoTargets(packages=tuple(), workspaces=(ws,))
 
-
-def test_find_all_rust_targets(rule_runner: RuleRunner) -> None:
+def test_workspace_members(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
-        "with_root/Cargo.toml": '[workspace]\n[package]\nname="foobar"\nversion = "0.1.0"',
-        "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
-        "with_root/src/lib.rs": "",
+        "ws/Cargo.toml": '[workspace]\nresolver = "2"\nmembers = ["a", "b"]\n',
+        "ws/Cargo.lock": "version = 4\n",
+        "ws/BUILD": 'cargo_workspace(name="workspace")',
+        **{k.replace("a/", "ws/a/", 1): v for k, v in package_fixture("a").items()},
+        **{k.replace("b/", "ws/b/", 1): v for k, v in package_fixture("b").items()},
+        **package_fixture("loose"),
     })
-    rust_targets = rule_runner.request(
-        AllCargoTargets,
-        [],
+    mapping = rule_runner.request(CargoPackageMapping, [])
+
+    ws = Address("ws", target_name="workspace")
+    a = rule_runner.get_target(Address("ws/a", generated_name="package"))
+    b = rule_runner.get_target(Address("ws/b", generated_name="package"))
+    loose = rule_runner.get_target(Address("loose", generated_name="package"))
+    assert mapping == CargoPackageMapping(
+        FrozenDict({ws: frozenset({CargoWorkspaceMember("a", a), CargoWorkspaceMember("b", b)})}),
+        frozenset({loose}),
     )
-
-    ws = rule_runner.get_target(Address("with_root", target_name="workspace"))
-    package = rule_runner.get_target(
-        Address("with_root", target_name="with_root", generated_name="package")
-    )
-    assert rust_targets == AllCargoTargets(packages=(package,), workspaces=(ws,))
+    assert mapping.workspace_for(a.address) == ws
+    assert mapping.workspace_for(loose.address) is None
 
 
-def test_root_package(rule_runner) -> None:
+def test_root_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
-        "with_root/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
-        "with_root/Cargo.toml": """
-[workspace]
-members = []
-[package]
-name = "root"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-""",
-        "with_root/src/lib.rs": "",
-    })
-
-    package_mapping = rule_runner.request(
-        CargoPackageMapping,
-        [],
-    )
-
-    ws = rule_runner.get_target(Address("with_root", target_name="workspace"))
-    package = rule_runner.get_target(
-        Address("with_root", target_name="with_root", generated_name="package")
-    )
-    sources = rule_runner.get_target(
-        Address("with_root", target_name="with_root", generated_name="sources")
-    )
-    assert package_mapping == CargoPackageMapping(
-        FrozenDict(
-            {
-                ws.address: frozenset({
-                    CargoWorkspaceMember(".", package, sources),
-                })
-            }
+        "ws/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
+        "ws/Cargo.toml": (
+            '[workspace]\nmembers = []\n[package]\nname = "root"\nversion = "0.1.0"\n'
+            'edition = "2021"\n'
         ),
-        set(),
+        "ws/Cargo.lock": 'version = 4\n\n[[package]]\nname = "root"\nversion = "0.1.0"\n',
+        "ws/src/lib.rs": "",
+    })
+    mapping = rule_runner.request(CargoPackageMapping, [])
+    ws = Address("ws", target_name="workspace")
+    package = rule_runner.get_target(Address("ws", generated_name="package"))
+    assert mapping == CargoPackageMapping(
+        FrozenDict({ws: frozenset({CargoWorkspaceMember(".", package)})}), frozenset()
     )

@@ -1,25 +1,28 @@
-import logging
+"""Which packages belong to which workspace, from the workspace manifests' `members`."""
+
+from __future__ import annotations
+
+import os
+import tomllib
 from dataclasses import dataclass
 
-import toml
 from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
-from pants.engine.fs import DigestContents, DigestSubset, PathGlobs, Snapshot
-from pants.engine.rules import Get, MultiGet, collect_rules, rule
-from pants.engine.target import AllTargets, MultipleSourcesField, Target, Targets
-from pants.option.global_options import UnmatchedBuildFileGlobs
+from pants.engine.addresses import Addresses
+from pants.engine.fs import DigestSubset, PathGlobs
+from pants.engine.internals.graph import hydrate_sources, resolve_targets
+from pants.engine.internals.specs_rules import resolve_addresses_from_raw_specs
+from pants.engine.intrinsics import digest_subset_to_digest, get_digest_contents
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
+from pants.engine.target import AllTargets, HydrateSourcesRequest, MultipleSourcesField, Target
 from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
     CargoPackageTargetImpl,
-    CargoSourcesTarget,
     CargoWorkspaceSourcesField,
     CargoWorkspaceTarget,
     _CargoPackageMarker,
-    _CargoSourcesMarker,
 )
-
-logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -28,22 +31,16 @@ class AllCargoTargets:
     workspaces: tuple[CargoWorkspaceTarget, ...]
 
 
-@rule(desc="Find all cargo packages in project")
-def find_all_cargo_targets(all_targets: AllTargets) -> AllCargoTargets:
+@rule(desc="Find all cargo packages and workspaces")
+async def find_all_cargo_targets(all_targets: AllTargets) -> AllCargoTargets:
     packages = []
     workspaces = []
-
     for target in all_targets:
         if target.has_field(CargoWorkspaceSourcesField):
             workspaces.append(target)
-
         if target.has_field(_CargoPackageMarker):
             packages.append(target)
-
-    return AllCargoTargets(
-        packages=tuple(packages),
-        workspaces=tuple(workspaces),
-    )
+    return AllCargoTargets(packages=tuple(packages), workspaces=tuple(workspaces))
 
 
 @dataclass(frozen=True)
@@ -56,122 +53,100 @@ class CargoTomlRequest:
     sources: MultipleSourcesField
 
 
-@rule(desc="Load Cargo.toml for Cargo target")
+@rule(desc="Load a Cargo.toml")
 async def load_cargo_toml(request: CargoTomlRequest) -> CargoToml:
-    snapshot = await Get(
-        Snapshot,
-        PathGlobs,
-        request.sources.path_globs(UnmatchedBuildFileGlobs.error()),
+    hydrated = await hydrate_sources(HydrateSourcesRequest(request.sources), **implicitly())
+    manifest = await digest_subset_to_digest(
+        DigestSubset(hydrated.snapshot.digest, PathGlobs(["**/Cargo.toml"]))
     )
-
-    digest_contents = await Get(
-        DigestContents, DigestSubset(snapshot.digest, PathGlobs(["**/Cargo.toml"]))
-    )
-
-    return CargoToml(digest_contents[0].content)
+    contents = await get_digest_contents(manifest)
+    if not contents:
+        raise ValueError(f"{request.sources.address}: no Cargo.toml among its sources")
+    return CargoToml(contents[0].content.decode())
 
 
 @dataclass(frozen=True)
 class CargoWorkspaceMember:
     member_path: str
     package: CargoPackageTargetImpl
-    sources: CargoSourcesTarget
 
 
 @dataclass(frozen=True)
 class CargoPackageMapping:
-    workspace_to_packages: FrozenDict[Address, tuple[CargoWorkspaceMember, ...]]
+    workspace_to_packages: FrozenDict[Address, frozenset[CargoWorkspaceMember]]
     loose_packages: frozenset[CargoPackageTargetImpl]
 
+    def workspace_for(self, address: Address) -> Address | None:
+        """The workspace a package (by its `cargo_package_impl` address) belongs to."""
+        for workspace, members in self.workspace_to_packages.items():
+            if any(address == m.package.address for m in members):
+                return workspace
+        return None
+
     def is_workspace_member(self, target: Target) -> bool:
+        return self.workspace_for(target.address) is not None
+
+    def get_workspace_for_package(self, target: Target) -> Address:
+        workspace = self.workspace_for(target.address)
+        if workspace is None:
+            raise ValueError(f"target {target.address} is not a workspace member")
+        return workspace
+
+    def get_workspace_members(self, address: Address) -> tuple[CargoWorkspaceMember, ...]:
         try:
-            self.get_workspace_for_package(target)
-            return True
-        except ValueError:
-            return False
-
-    def get_workspace_for_package(self, target: Target) -> CargoWorkspaceTarget:
-        for workspace, members in self.workspace_to_packages.items():
-            for m in members:
-                if target.address == m.package.address or target.address == m.sources.address:
-                    return workspace
-
-        raise ValueError(f"target {target.address} is not a workspace member")
-
-    def get_workspace_members(self, target: Target) -> tuple[CargoPackageTargetImpl, ...]:
-        for workspace, members in self.workspace_to_packages.items():
-            if target == workspace:
-                return tuple(members)
-
-        raise ValueError(f"target {target.address} is not a workspace")
+            return tuple(self.workspace_to_packages[address])
+        except KeyError:
+            raise ValueError(f"target {address} is not a workspace") from None
 
 
 @rule(desc="Assign packages to workspaces")
-async def assign_packages_to_workspaces(
-    all_cargo_targets: AllCargoTargets,
-) -> CargoPackageMapping:
-    workspace_cargo_toml = await MultiGet(
-        Get(CargoToml, CargoTomlRequest(workspace[CargoWorkspaceSourcesField]))
+async def assign_packages_to_workspaces(all_cargo_targets: AllCargoTargets) -> CargoPackageMapping:
+    manifests = await concurrently(
+        load_cargo_toml(CargoTomlRequest(workspace[CargoWorkspaceSourcesField]))
         for workspace in all_cargo_targets.workspaces
     )
 
-    workspace_to_packages = {}
+    workspace_to_packages: dict[Address, frozenset[CargoWorkspaceMember]] = {}
     packages = set(all_cargo_targets.packages)
-    for ws, cargo_content in zip(all_cargo_targets.workspaces, workspace_cargo_toml):
-        toml_data = toml.loads(cargo_content.contents.decode("utf-8"))
-        members = toml_data["workspace"].get("members", [])
-        globs = [f"{ws.address.spec_path}/{member}" for member in members]
-        if "package" in toml_data:
-            globs.append(ws.address.spec_path)
+    for workspace, manifest in zip(all_cargo_targets.workspaces, manifests):
+        data = tomllib.loads(manifest.contents)
+        members = list(data.get("workspace", {}).get("members", []))
+        if "package" in data:
             members.append(".")
+        globs = [os.path.normpath(os.path.join(workspace.address.spec_path, m)) for m in members]
 
-        candidate_targets_per_member = await MultiGet(
-            Get(
-                Targets,
+        address_sets = await concurrently(
+            resolve_addresses_from_raw_specs(
                 RawSpecs(
                     dir_globs=(DirGlobSpec(glob),),
-                    description_of_origin="Assigning packages to workspaces",
-                ),
+                    description_of_origin=f"the members of {workspace.address}",
+                )
             )
             for glob in globs
         )
+        candidates = await concurrently(
+            resolve_targets(**implicitly({addresses: Addresses})) for addresses in address_sets
+        )
 
-        workspace_members = []
-
-        for member, member_targets in zip(members, candidate_targets_per_member):
-            filtered_targets = [
-                target for target in member_targets if target.has_field(_CargoPackageMarker)
-            ]
-
-            filtered_sources_targets = [
-                target for target in member_targets if target.has_field(_CargoSourcesMarker)
-            ]
-
-            if len(filtered_targets) > 1:
-                addresses = [t.address for t in filtered_targets]
+        found = []
+        for member, targets in zip(members, candidates):
+            package_targets = [t for t in targets if t.has_field(_CargoPackageMarker)]
+            if len(package_targets) > 1:
                 raise ValueError(
-                    f"found two package targets in directory '{ws.address.spec_path}/{member}':"
-                    f" {addresses}"
+                    f"{workspace.address}: member `{member}` has more than one package target: "
+                    f"{sorted(t.address for t in package_targets)}"
                 )
-
-            packages -= set(filtered_targets)
-
-            workspace_members.append(
-                CargoWorkspaceMember(
-                    member_path=member,
-                    package=filtered_targets[0],
-                    sources=filtered_sources_targets[0],
-                )
-            )
-
-        workspace_to_packages[ws.address] = frozenset(workspace_members)
+            if not package_targets:
+                continue
+            packages -= set(package_targets)
+            found.append(CargoWorkspaceMember(member_path=member, package=package_targets[0]))
+        workspace_to_packages[workspace.address] = frozenset(found)
 
     return CargoPackageMapping(
-        workspace_to_packages=FrozenDict(workspace_to_packages), loose_packages=frozenset(packages)
+        workspace_to_packages=FrozenDict(workspace_to_packages),
+        loose_packages=frozenset(packages),
     )
 
 
 def rules():
-    return [
-        *collect_rules(),
-    ]
+    return collect_rules()

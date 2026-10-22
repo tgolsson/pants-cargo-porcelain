@@ -1,8 +1,9 @@
 [project]
 name = "pants_cargo_porcelain"
 description = ""
-version = "0.4.0"
+version = "0.5.0"
 authors = [{ name = "Tom Solberg", email = "me@sbg.dev" }]
+requires-python = ">=3.11"
 
 license = { text = "Apache-2.0" }
 keywords = ["pantsbuild", "pants"]
@@ -13,7 +14,7 @@ classifiers = [
   "Topic :: Software Development :: Build Tools",
 ]
 
-dependencies = ["toml>=0.10.2"]
+dependencies = []
 
 [project.urls]
 Repository = "https://github.com/tgolsson/pants-cargo-porcelain"

@@ -1,211 +1,222 @@
+"""One cargo invocation as a Pants `Process`.
+
+Every process gets the installed toolchain and the rustup/cargo named caches, a fresh `target/`
+inside the sandbox, and, unless disabled, kache as `RUSTC_WRAPPER`: cargo's own incremental
+state cannot survive a fresh sandbox, so compiled crates are keyed by content and kept in a
+named cache instead. The sandbox root is remapped to a fixed prefix in rustc's output, so
+compiled artefacts and kache keys do not depend on the sandbox path."""
+
 from __future__ import annotations
 
 import os
+import tomllib
 from dataclasses import dataclass
 
+from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.system_binaries import (
     BashBinary,
-    BinaryPath,
     BinaryPathRequest,
-    BinaryPaths,
-    BinaryPathTest,
-    BinaryShims,
     BinaryShimsRequest,
     SystemBinariesSubsystem,
+    create_binary_shims,
+    find_binary,
 )
-from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
-from pants.engine.process import Process
-from pants.engine.rules import Get, collect_rules, rule
+from pants.engine.fs import (
+    EMPTY_DIGEST,
+    CreateDigest,
+    Digest,
+    DigestSubset,
+    FileContent,
+    MergeDigests,
+    PathGlobs,
+)
+from pants.engine.intrinsics import (
+    create_digest,
+    digest_subset_to_digest,
+    get_digest_contents,
+    merge_digests,
+)
+from pants.engine.platform import Platform
+from pants.engine.process import Process, ProcessCacheScope
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest
-from pants_cargo_porcelain.tools.mtime import CargoMtime
+from pants_cargo_porcelain.subsystems import KacheTool
 from pants_cargo_porcelain.util_rules.rustup import (
-    BOTH_CACHES,
     CARGO_NAMED_CACHE,
     RUSTUP_NAMED_CACHE,
+    TOOLCHAIN_CACHES,
     RustToolchain,
 )
+
+TARGET_DIR = "target"
+KACHE_TOOL_DIR = ".kache"
+KACHE_NAMED_CACHE = ".kache-data"
+SANDBOX_PREFIX = "/pants-sandbox"
+SCRIPT_NAME = "__cargo.sh"
+
+# What rustc and build scripts reach through PATH. `cc` is rustc's default linker driver and
+# what cc-rs runs; the binutils are what `cc` and build scripts call by name; `getconf` and
+# (on Linux) `ldd` are how kache identifies the host libc for its cache key: without them
+# every crate is "uncacheable".
+_SHIMMED = ("cc", "ld", "ar", "as", "getconf")
+_SHIMMED_LINUX = ("ldd",)
+# Shimmed when the host has them: what `-sys` crates' build scripts look for.
+_OPTIONAL = ("pkg-config",)
+
+# What every cargo process sets itself (see `make_cargo_process`); a package's `env` may not.
+_RESERVED_ENV = frozenset({
+    "PATH",
+    "CARGO",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "CARGO_INCREMENTAL",
+    "RUSTUP_HOME",
+    "RUSTC_WRAPPER",
+    "RUSTFLAGS",
+})
+
+
+def is_reserved_env(key: str) -> bool:
+    return key in _RESERVED_ENV or key.startswith("KACHE_")
+
+
+async def config_linkers(digest: Digest) -> tuple[str, ...]:
+    """The bare-name linkers the staged `.cargo/config.toml`s set per target (`linker =
+    "gcc"`, `"x86_64-w64-mingw32-gcc"`): cargo passes them to rustc by name, so they must be
+    on the sandbox PATH too."""
+    contents = await get_digest_contents(
+        await digest_subset_to_digest(DigestSubset(digest, PathGlobs(["**/.cargo/config.toml"])))
+    )
+    names = set()
+    for file_content in contents:
+        config = tomllib.loads(file_content.content.decode())
+        for target in config.get("target", {}).values():
+            linker = target.get("linker") if isinstance(target, dict) else None
+            if isinstance(linker, str) and "/" not in linker:
+                names.add(linker)
+    return tuple(sorted(names))
+
+
+def manifest_path(spec_path: str) -> str:
+    """`<spec_path>/Cargo.toml`, or `Cargo.toml` for a target at the build root."""
+    return os.path.join(spec_path, "Cargo.toml")
 
 
 @dataclass(frozen=True)
 class CargoProcessRequest:
-    toolchain: RustToolchain
-    command: str
+    """`cargo <command>`; or, with `script`, a shell script that runs `$CARGO` itself (the
+    test build needs to post-process cargo's output in the same sandbox)."""
 
+    toolchain: RustToolchain
+    command: tuple[str, ...]
+    description: str
     digest: Digest = EMPTY_DIGEST
     output_files: tuple[str, ...] = ()
-
-    cache_path: str | None = None
-
-    description: str | None = None
-
-    immutable_input_digests: map[str, Digest] = FrozenDict()
-    append_only_caches: map[str, str] = FrozenDict()
-    env: map[str, str] = FrozenDict()
+    output_directories: tuple[str, ...] = ()
+    env: FrozenDict[str, str] = FrozenDict()
+    script: str | None = None
+    extra_shims: tuple[str, ...] = ()
+    cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL
+    level: LogLevel = LogLevel.DEBUG
 
 
-@dataclass(frozen=True)
-class CargoProcess:
-    request: Process
-
-
-class CCBinary(BinaryPath):
-    """Path to the rustup binary used to select and gain access to Rust toolchains."""
-
-
-@rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_cc(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> CCBinary:
-    request = BinaryPathRequest(
-        binary_name="cc",
-        search_path=system_binaries.system_binary_paths,
-        test=BinaryPathTest(args=["-v"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
-    return CCBinary(first_path.path, first_path.fingerprint)
-
-
-class LDBinary(BinaryPath):
-    """Path to the rustup binary used to select and gain access to Rust toolchains."""
-
-
-@rule(desc="Finding the `zip` binary", level=LogLevel.DEBUG)
-async def find_ld(system_binaries: SystemBinariesSubsystem.EnvironmentAware) -> LDBinary:
-    request = BinaryPathRequest(
-        binary_name="ld",
-        search_path=system_binaries.system_binary_paths,
-        test=BinaryPathTest(args=["-v"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="create `.zip` archives")
-    return LDBinary(first_path.path, first_path.fingerprint)
-
-
-class RealpathBinary(BinaryPath):
-    pass
-
-
-@rule(desc="Finding the `realpath` binary", level=LogLevel.DEBUG)
-async def find_realpath(
-    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
-) -> RealpathBinary:
-    request = BinaryPathRequest(
-        binary_name="realpath",
-        search_path=system_binaries.system_binary_paths,
-        test=BinaryPathTest(args=["-v"]),
-    )
-    paths = await Get(BinaryPaths, BinaryPathRequest, request)
-    first_path = paths.first_path_or_raise(request, rationale="resolve named caches")
-    return LDBinary(first_path.path, first_path.fingerprint)
-
-
-@rule(level=LogLevel.DEBUG, desc="Determine candidate Cargo targets to create")
+@rule
 async def make_cargo_process(
-    req: CargoProcessRequest,
-    cc: CCBinary,
-    ld: LDBinary,
+    request: CargoProcessRequest,
+    kache: KacheTool,
     bash: BashBinary,
-    mtime: CargoMtime,
-    system_binaries_environment: SystemBinariesSubsystem.EnvironmentAware,
+    platform: Platform,
+    system_binaries: SystemBinariesSubsystem.EnvironmentAware,
 ) -> Process:
-    binary_shims = await Get(
-        BinaryShims,
+    shims = await create_binary_shims(
         BinaryShimsRequest.for_binaries(
-            "cp",
-            "cc",
-            "ld",
-            "as",
-            "ar",
-            "realpath",
-            rationale="rustc",
-            search_path=system_binaries_environment.system_binary_paths,
+            *_SHIMMED,
+            *(_SHIMMED_LINUX if platform.value.startswith("linux") else ()),
+            *request.extra_shims,
+            rationale="run cargo",
+            search_path=system_binaries.system_binary_paths,
         ),
+        **implicitly(),
+    )
+    # Linkers from the cargo config and the optional tools are shimmed when the host has
+    # them; a linker for another target (the MinGW one on a Mac) is simply absent, and only
+    # a build for that target would miss it.
+    optional_paths = await concurrently(
+        find_binary(
+            BinaryPathRequest(binary_name=name, search_path=system_binaries.system_binary_paths),
+            **implicitly(),
+        )
+        for name in (*_OPTIONAL, *await config_linkers(request.digest))
+    )
+    linkers = await create_binary_shims(
+        BinaryShimsRequest.for_paths(
+            *(paths.first_path for paths in optional_paths if paths.first_path),
+            rationale="run cargo",
+        ),
+        **implicitly(),
     )
 
-    append_only_caches = FrozenDict({**BOTH_CACHES, **req.append_only_caches})
     env = {
-        "PATH": f"{{chroot}}:{{chroot}}/{req.toolchain.path}/bin:{binary_shims.path_component}",
-        "RUSTUP_HOME": RUSTUP_NAMED_CACHE,
-        "CARGO_HOME": CARGO_NAMED_CACHE,
-        "RUSTFLAGS": f"-C linker={cc.path}",
-        **req.env,
+        "PATH": ":".join((
+            f"{{chroot}}/{request.toolchain.bin_dir}",
+            linkers.path_component,
+            shims.path_component,
+        )),
+        "RUSTUP_HOME": f"{{chroot}}/{RUSTUP_NAMED_CACHE}",
+        "CARGO_HOME": f"{{chroot}}/{CARGO_NAMED_CACHE}",
+        "CARGO_TARGET_DIR": f"{{chroot}}/{TARGET_DIR}",
+        # Incremental compilation only pays off when the target directory is reused.
+        "CARGO_INCREMENTAL": "0",
+        # Overrides `build.rustflags` from a `.cargo/config.toml`; see the README.
+        "RUSTFLAGS": f"--remap-path-prefix={{chroot}}={SANDBOX_PREFIX}",
     }
-    mtime_script = ""
+    append_only_caches = dict(TOOLCHAIN_CACHES)
+    immutable_input_digests = {
+        **shims.immutable_input_digests,
+        **linkers.immutable_input_digests,
+    }
 
-    immutable_input_digests = {**req.immutable_input_digests}
-    if mtime.enabled and req.cache_path:
-        mtime_tool = await Get(InstalledRustTool, RustToolRequest, mtime.as_tool_request())
-        immutable_input_digests[".cargo-mtime"] = mtime_tool.digest
-        env["CARGO_MTIME_DB_PATH"] = f".cargo-target-cache/{req.cache_path}.db"
-        env["CARGO_MTIME_ROOT"] = "."
-        mtime_script = "cargo-mtime"
+    if kache.enabled:
+        tool = await download_external_tool(kache.get_request(platform))
+        immutable_input_digests[KACHE_TOOL_DIR] = tool.digest
+        append_only_caches["kache"] = KACHE_NAMED_CACHE
+        env.update({
+            "RUSTC_WRAPPER": f"{{chroot}}/{KACHE_TOOL_DIR}/kache",
+            "KACHE_CACHE_DIR": f"{{chroot}}/{KACHE_NAMED_CACHE}",
+            "KACHE_BASE_DIR": "{chroot}",
+            "KACHE_MAX_SIZE": kache.cache_size,
+            "KACHE_LOCAL_ONLY": "1",
+        })
 
-    if immutable_input_digests:
-        for path, digest in immutable_input_digests.items():
-            env["PATH"] = f"{{chroot}}/{path}:{env['PATH']}"
+    env.update(request.env)
 
-    command = " ".join(req.command)
-
-    target_dir_string = ""
-    output_files = req.output_files
-    if req.cache_path:
-        append_only_caches = FrozenDict({"ctc": ".cargo-target-cache", **append_only_caches})
-        target_dir_string = (
-            f"export CARGO_TARGET_DIR=$(realpath .cargo-target-cache)/{req.cache_path}"
+    cargo = f"{{chroot}}/{request.toolchain.cargo}"
+    if request.script is None:
+        argv: tuple[str, ...] = (cargo, *request.command)
+        input_digest = request.digest
+    else:
+        env["CARGO"] = cargo
+        script = await create_digest(
+            CreateDigest([FileContent(SCRIPT_NAME, request.script.encode(), is_executable=True)])
         )
-
-        output_files = tuple(
-            f.replace("{cache_path}", f".cargo-target-cache/{req.cache_path}") for f in output_files
-        )
-
-    copy_files = []
-    new_output_files = []
-    for file in output_files:
-        if "cargo-target-cache" not in file:
-            new_output_files.append(file)
-            continue
-
-        output_file = os.path.basename(file)
-        copy_files.append(f"cp -r {file} {output_file}")
-        new_output_files.append(output_file)
-
-    copy_files = "\n".join(copy_files)
-    script = f"""
-    #!/usr/bin/env bash
-    set -euo pipefail
-    export CARGO_HOME=$(realpath .cargo)
-    export RUSTUP_HOME=$(realpath .rustup)
-    export SCCACHE_DIR=$(realpath .sccache-cache)/{req.cache_path}
-    {target_dir_string}
-    export SCCACHE_SERVER_PORT=$((1024+ RANDOM % 20000))
-    {mtime_script}
-    {req.toolchain.cargo} {command}
-    {copy_files}
-    """
-
-    digest = await Get(Digest, CreateDigest([FileContent("run.sh", script.encode())]))
-    merged_digest = await Get(Digest, MergeDigests([digest, req.digest]))
-
-    description = req.description or f'Run `cargo {" ".join(req.command)}`'
+        input_digest = await merge_digests(MergeDigests([request.digest, script]))
+        argv = (bash.path, SCRIPT_NAME, *request.command)
 
     return Process(
-        argv=(bash.path, "run.sh"),
-        input_digest=merged_digest,
-        description=description,
-        append_only_caches=append_only_caches,
-        output_files=new_output_files,
-        immutable_input_digests={
-            **binary_shims.immutable_input_digests,
-            **immutable_input_digests,
-        },
-        level=LogLevel.DEBUG,
+        argv=argv,
+        input_digest=input_digest,
+        description=request.description,
+        level=request.level,
         env=env,
+        append_only_caches=FrozenDict(append_only_caches),
+        immutable_input_digests=FrozenDict(immutable_input_digests),
+        output_files=request.output_files,
+        output_directories=request.output_directories,
+        cache_scope=request.cache_scope,
     )
 
 
 def rules():
-    return [
-        *collect_rules(),
-    ]
+    return collect_rules()
