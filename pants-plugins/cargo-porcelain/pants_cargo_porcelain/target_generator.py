@@ -29,10 +29,9 @@ from pants_cargo_porcelain.target_types import (
 )
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
 from pants_cargo_porcelain.util_rules.rustup import (
-    RustToolchainRequest,
     RustVersion,
     install_rust_toolchain,
-    platform_triple,
+    machine_toolchain_request,
 )
 
 PACKAGE_GENERATED_NAME = "package"
@@ -68,9 +67,7 @@ async def generate_cargo_targets(
     source_files = await determine_source_files(
         SourceFilesRequest([generator.get(CargoPackageSourcesField)])
     )
-    toolchain = await install_rust_toolchain(
-        RustToolchainRequest(version.version, platform_triple(platform), version.components)
-    )
+    toolchain = await install_rust_toolchain(machine_toolchain_request(version, platform))
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
             CargoProcessRequest(

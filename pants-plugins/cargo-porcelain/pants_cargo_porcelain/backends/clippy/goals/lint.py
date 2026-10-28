@@ -8,21 +8,18 @@ from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.lint import LintResult, LintTargetsRequest
 from pants.core.util_rules.partitions import Partition, Partitions
 from pants.engine.intrinsics import execute_process
-from pants.engine.platform import Platform
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
+from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
 from pants_cargo_porcelain.backends.clippy.subsystem import ClippySubsystem
 from pants_cargo_porcelain.goals.fmt import RootMetadata, root_of
 from pants_cargo_porcelain.target_types import CargoPackageNameField, _CargoPackageMarker
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
-from pants_cargo_porcelain.util_rules.rustup import (
-    RustToolchainRequest,
-    RustVersion,
-    install_rust_toolchain,
-    platform_triple,
-)
+from pants_cargo_porcelain.util_rules.platform import CargoPlatformRequest, cargo_platform
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
@@ -57,15 +54,20 @@ async def partition_clippy(
 async def run_clippy(
     request: CargoClippyRequest.Batch[CargoClippyFieldSet, RootMetadata],
     clippy: ClippySubsystem,
-    version: RustVersion,
-    platform: Platform,
+    known: KnownPlatforms,
 ) -> LintResult:
     root = request.partition_metadata
-    toolchain = await install_rust_toolchain(
-        RustToolchainRequest(version.version, platform_triple(platform), version.components)
-    )
-    sources = await cargo_sources(
-        CargoSourcesRequest(frozenset([root.root]), include_packages=True)
+    toolchain, cargo, sources = await concurrently(
+        install_rust_toolchain(**implicitly()),
+        cargo_platform(CargoPlatformRequest(known.host)),
+        cargo_sources(
+            CargoSourcesRequest(
+                frozenset([root.root]),
+                include_packages=True,
+                platform=known.host,
+                dependent=root.root,
+            )
+        ),
     )
     result = await execute_process(
         **implicitly(
@@ -80,7 +82,7 @@ async def run_clippy(
                 ),
                 description=f"cargo clippy {root.root}",
                 digest=sources.digest,
-                env=sources.env,
+                env=FrozenDict({**sources.env, **cargo.env}),
                 level=LogLevel.INFO,
             )
         )

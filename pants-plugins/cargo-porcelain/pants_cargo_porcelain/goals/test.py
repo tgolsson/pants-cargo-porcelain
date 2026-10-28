@@ -20,12 +20,12 @@ from pants.engine.intrinsics import (
     get_digest_contents,
     merge_digests,
 )
-from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import Target
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
 from pants_cargo_porcelain.subsystems import CargoTestSubsystem
 from pants_cargo_porcelain.target_generator import PACKAGE_GENERATED_NAME, artifact_kind
@@ -37,12 +37,8 @@ from pants_cargo_porcelain.target_types import (
     SkipCargoTestsField,
 )
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
-from pants_cargo_porcelain.util_rules.rustup import (
-    RustToolchainRequest,
-    RustVersion,
-    install_rust_toolchain,
-    platform_triple,
-)
+from pants_cargo_porcelain.util_rules.platform import CargoPlatformRequest, cargo_platform
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources, parse_env
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
@@ -130,13 +126,19 @@ class CargoTestBuild:
 
 @rule(desc="Build the cargo test executables")
 async def build_test_executables(
-    request: CargoTestBuildRequest, version: RustVersion, platform: Platform
+    request: CargoTestBuildRequest, known: KnownPlatforms
 ) -> CargoTestBuild:
-    toolchain, sources = await concurrently(
-        install_rust_toolchain(
-            RustToolchainRequest(version.version, platform_triple(platform), version.components)
+    toolchain, cargo, sources = await concurrently(
+        install_rust_toolchain(**implicitly()),
+        cargo_platform(CargoPlatformRequest(known.host)),
+        cargo_sources(
+            CargoSourcesRequest(
+                frozenset([request.root]),
+                include_packages=True,
+                platform=known.host,
+                dependent=request.root,
+            )
         ),
-        cargo_sources(CargoSourcesRequest(frozenset([request.root]), include_packages=True)),
     )
     result = await fallible_to_exec_result_or_raise(
         **implicitly(
@@ -152,7 +154,7 @@ async def build_test_executables(
                 extra_shims=("grep", "cut", "cp", "mkdir"),
                 output_files=(REPORT, ROOT_FILE),
                 output_directories=(BIN_DIR,),
-                env=sources.env,
+                env=FrozenDict({**sources.env, **cargo.env}),
                 level=LogLevel.INFO,
             )
         )

@@ -1,6 +1,7 @@
 """What a cargo process gets in its sandbox: the cargo sources of the transitive closure, the
 `files`/`resources` in it, and, when asked for, the `package` output of any packageable target
-in it (a library another backend builds, for example), staged at its package path. The closure
+in it (a library another backend builds, for example), staged at its package path and, when its
+backend builds for platforms, built for the one cargo builds for. The closure
 stops at such a target: its own dependencies are its backend's inputs, not cargo's. A workspace
 root brings its member packages, which do not depend on it in the graph. A workspace reached
 otherwise brings only its other members' cargo sources: cargo loads every member."""
@@ -20,7 +21,8 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.addresses import Address
 from pants.engine.fs import Digest, MergeDigests
 from pants.engine.internals.graph import find_valid_field_sets, transitive_targets
-from pants.engine.intrinsics import merge_digests
+from pants.engine.intrinsics import digest_subset_to_digest, merge_digests
+from pants.engine.platform import Platform
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     Dependencies,
@@ -33,6 +35,12 @@ from pants.engine.target import (
 )
 from pants.engine.unions import UnionMembership
 from pants.util.frozendict import FrozenDict
+from pants_backend_platforms.util_rules.contract import (
+    PlatformDependenciesRequest,
+    build_platform_dependencies,
+    platform_build_files,
+)
+from pants_backend_platforms.util_rules.platforms import TargetPlatform
 
 from pants_cargo_porcelain.target_types import (
     CargoArtifactKindField,
@@ -41,6 +49,11 @@ from pants_cargo_porcelain.target_types import (
     CargoWorkspaceSourcesField,
 )
 from pants_cargo_porcelain.util_rules.cargo import is_reserved_env
+from pants_cargo_porcelain.util_rules.platform import (
+    RustTargetRequest,
+    platform_triple,
+    rust_target,
+)
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
 _CARGO_FIELDS = (CargoPackageSourcesField, CargoWorkspaceSourcesField)
@@ -52,6 +65,9 @@ class CargoSourcesRequest:
     include_packages: bool
     """Whether to build the packageable targets in the closure and stage their outputs: what
     compiles needs them, `cargo fmt` and `cargo update` do not."""
+    platform: TargetPlatform
+    dependent: Address
+    """Named in the error for a packageable target whose `platforms` lacks `platform`."""
     include_cargo_sources: bool = True
     """Whether to include the closure's cargo sources: `run` needs only its files, packages and
     `env`."""
@@ -78,13 +94,20 @@ def parse_env(entries: tuple[str, ...] | None) -> FrozenDict[str, str]:
     return FrozenDict(env)
 
 
-def merge_env(targets: Iterable[Target]) -> FrozenDict[str, str]:
+def merge_env(targets: Iterable[Target], triples: Iterable[str]) -> FrozenDict[str, str]:
+    """`triples` are those the cargo process builds for."""
     env: dict[str, str] = {}
     for target in targets:
         if not target.has_field(CargoEnvField):
             continue
         for key, value in parse_env(target[CargoEnvField].value).items():
-            if is_reserved_env(key):
+            if key in ("CC", "CXX", "AR"):
+                raise ValueError(
+                    f"{target.address} sets `{key}` in `env`, but cargo builds take their C "
+                    "tools from the `cc_toolchain` of the platform they build for, so it would "
+                    "be ignored"
+                )
+            if is_reserved_env(key, triples):
                 raise ValueError(
                     f"{target.address} sets `{key}` in `env`, but the cargo backend sets "
                     f"`{key}` itself for every cargo process"
@@ -128,6 +151,7 @@ async def cargo_sources(
     request: CargoSourcesRequest,
     mapping: CargoPackageMapping,
     union_membership: UnionMembership,
+    platform: Platform,
 ) -> CargoSources:
     predicate = _StopAtPackages(tuple(union_membership.get(PackageFieldSet)))
     roots = set(request.addresses) | _members(mapping, request.addresses)
@@ -164,20 +188,35 @@ async def cargo_sources(
         elif request.include_packages:
             packageable.append(tgt)
 
-    field_sets = await find_valid_field_sets(
-        FieldSetsPerTargetRequest(PackageFieldSet, packageable), **implicitly()
-    )
-    sources, packages = await concurrently(
+    sources, platform_builds, package_field_sets, target = await concurrently(
         determine_source_files(SourceFilesRequest(source_fields)),
+        build_platform_dependencies(
+            PlatformDependenciesRequest(request.dependent, tuple(packageable), request.platform),
+            **implicitly(),
+        ),
+        find_valid_field_sets(
+            FieldSetsPerTargetRequest(PackageFieldSet, packageable), **implicitly()
+        ),
+        rust_target(RustTargetRequest(request.platform), **implicitly()),
+    )
+    packages, built = await concurrently(
         concurrently(
             environment_aware_package(EnvironmentAwarePackageRequest(fs))
-            for fs in field_sets.field_sets
+            for fs in package_field_sets.field_sets
+            if fs.address not in platform_builds.builds
+        ),
+        concurrently(
+            digest_subset_to_digest(
+                platform_build_files(b, f"the build of {address} for {request.platform.name}")
+            )
+            for address, b in platform_builds.builds.items()
         ),
     )
     digest = await merge_digests(
-        MergeDigests([sources.snapshot.digest, *(p.digest for p in packages)])
+        MergeDigests([sources.snapshot.digest, *(p.digest for p in packages), *built])
     )
-    return CargoSources(digest, sources.files, merge_env(closure.closure))
+    triples = (target.triple, platform_triple(platform))
+    return CargoSources(digest, sources.files, merge_env(closure.closure, triples))
 
 
 def rules():

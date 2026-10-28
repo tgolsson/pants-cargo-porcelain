@@ -6,11 +6,21 @@ from pants.option.option_types import BoolOption, SkipOption, StrOption
 from pants.option.subsystem import Subsystem
 from pants.util.strutil import softwrap
 
+# The Rust target a `platform` builds as when it sets no `rust_target`, by (os, arch).
+DEFAULT_TRIPLES = {
+    ("linux", "x86_64"): "x86_64-unknown-linux-gnu",
+    ("linux", "aarch64"): "aarch64-unknown-linux-gnu",
+    ("windows", "x86_64"): "x86_64-pc-windows-gnu",
+    ("macos", "aarch64"): "aarch64-apple-darwin",
+    ("macos", "x86_64"): "x86_64-apple-darwin",
+}
+
+# The machines Pants runs on, by `Platform` value.
 PLATFORM_TRIPLES = {
-    "linux_arm64": "aarch64-unknown-linux-gnu",
-    "linux_x86_64": "x86_64-unknown-linux-gnu",
-    "macos_arm64": "aarch64-apple-darwin",
-    "macos_x86_64": "x86_64-apple-darwin",
+    "linux_arm64": DEFAULT_TRIPLES["linux", "aarch64"],
+    "linux_x86_64": DEFAULT_TRIPLES["linux", "x86_64"],
+    "macos_arm64": DEFAULT_TRIPLES["macos", "aarch64"],
+    "macos_x86_64": DEFAULT_TRIPLES["macos", "x86_64"],
 }
 
 

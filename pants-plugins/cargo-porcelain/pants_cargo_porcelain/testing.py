@@ -16,11 +16,16 @@ from pants.engine.rules import QueryRule, Rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_platforms import register as platforms_register
+from pants_backend_platforms.testutil import HOST, HOST_ARCH, HOST_OS
+from pants_backend_platforms.util_rules.platforms import TargetPlatform
 
 from pants_cargo_porcelain import register
 from pants_cargo_porcelain.backends.clippy import register as clippy_register
 
 RUST_VERSION = "1.97.0"
+# The implicit host, or a `platform` target named like it.
+HOST_PLATFORM = TargetPlatform(HOST, HOST_OS, HOST_ARCH)
 
 
 def make_rule_runner(
@@ -44,7 +49,12 @@ def make_rule_runner(
             *query_rules,
             *rules,
         ],
-        target_types=[*register.target_types(), FilesGeneratorTarget, *target_types],
+        target_types=[
+            *register.target_types(),
+            *platforms_register.target_types(),
+            FilesGeneratorTarget,
+            *target_types,
+        ],
         bootstrap_args=[f"--named-caches-dir={Path.home() / '.cache' / 'pants' / 'named_caches'}"],
     )
     rule_runner.set_options(

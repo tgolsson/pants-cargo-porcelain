@@ -29,7 +29,8 @@ stability guarantees until it nears feature completeness.
   `run` binaries those build; `{chroot}` is the sandbox root, so
   `env=["MYLIB_DIR={chroot}/build"]` points a build script at a staged library. `PATH`,
   `CARGO`, `CARGO_HOME`, `CARGO_TARGET_DIR`, `CARGO_INCREMENTAL`, `RUSTUP_HOME`,
-  `RUSTC_WRAPPER`, `RUSTFLAGS` and `KACHE_*` are the backend's and rejected. `skip_tests` as
+  `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the toolchain's `CARGO_TARGET_<TRIPLE>_LINKER`,
+  `CC_<triple>`, `CXX_<triple>` and `AR_<triple>` are the backend's and rejected. `skip_tests` as
   usual; `output_path` is the directory under `dist/` (default `path.to.target/`), the file
   keeps the binary's name. A target with `test = false` in
   `Cargo.toml` gets `skip_tests`. A `[[bin]]` or `[[test]]` named `package` or `library`, or a
@@ -53,8 +54,33 @@ in front of rustc: compiled crates are keyed by their inputs and kept in a named
 unchanged crates are restored rather than rebuilt, across sandboxes and across packages of a
 workspace. Local only, no daemon. `--remap-path-prefix` maps the sandbox root to a fixed
 prefix so rustc's output does not depend on the sandbox path; this sets `RUSTFLAGS`, so a
-`build.rustflags` in `.cargo/config.toml` is not read. Cargo's own `[target.<triple>]
-linker` is.
+`build.rustflags` in `.cargo/config.toml` is not read. Its `[target.<triple>] linker` is only
+for plain `cargo`: under Pants the platform's `cc_toolchain` links (see Platforms).
+
+## Platforms
+
+The backend builds for the `platform` targets of
+[pants-backend-platforms](https://github.com/tgolsson/pants-backends). A `cargo_package`'s
+`platforms` field lists what its binaries can be built for, the host alone when unset; `pants
+package` builds those that are the host or in `[platforms].enabled`, the host's binary at its
+usual path and every other under `dist/<platform>/`, with `.exe` for Windows.
+
+```python
+platform(name="windows-x86_64", os="windows", arch="x86_64")  # builds as x86_64-pc-windows-gnu
+cargo_package(platforms=["linux-x86_64", "windows-x86_64"])
+```
+
+- A `platform` builds as its `rust_target`, by default the triple of its `os` and `arch`
+  (`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-pc-windows-gnu`,
+  `aarch64-apple-darwin`, `x86_64-apple-darwin`). Every enabled platform's target is installed
+  with the toolchain. Another platform's build passes `--target`; the host's does not.
+- The platform's `cc_toolchain` links the binary and is cc-rs's compiler for that triple,
+  host included; a cross build also gets the host's for its build scripts and proc macros.
+- A packageable dependency of another backend that builds for platforms (a `cmake_target`)
+  is built for the same platform, and must list it in its own `platforms`. Cargo packages
+  that a binary depends on need no `platforms` of their own.
+- `run`, `test`, `fmt`, `lint` and `generate-lockfiles` build for the host only; `test` and
+  `lint` do not pass `--target`, even for a host whose `rust_target` is not the machine's.
 
 ## Goals
 
@@ -95,4 +121,4 @@ args = ["--", "-Dwarnings"]
 enabled = true  # the default; false runs rustc bare
 ```
 
-Linux and macOS, host `cc`/binutils for linking. No cross-compilation yet.
+Linux and macOS. With no `cc_toolchain` targets, the host's `gcc`, `g++` and `ar` link.

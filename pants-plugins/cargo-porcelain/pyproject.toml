@@ -14,7 +14,9 @@ classifiers = [
   "Topic :: Software Development :: Build Tools",
 ]
 
-dependencies = []
+dependencies = [
+  "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@dc96abf81de4e01628213fb39c50d24a7f2e89f8#subdirectory=pants-plugins/platforms",
+]
 
 [project.urls]
 Repository = "https://github.com/tgolsson/pants-cargo-porcelain"

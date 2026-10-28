@@ -11,21 +11,16 @@ from pants.core.util_rules.source_files import SourceFilesRequest, determine_sou
 from pants.engine.addresses import Address
 from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs
 from pants.engine.intrinsics import digest_subset_to_digest, merge_digests
-from pants.engine.platform import Platform
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
 from pants_cargo_porcelain.subsystems import RustSubsystem
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
-from pants_cargo_porcelain.util_rules.rustup import (
-    RustToolchainRequest,
-    RustVersion,
-    install_rust_toolchain,
-    platform_triple,
-)
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
@@ -83,14 +78,19 @@ async def partition_cargo_fmt(
 
 @rule(desc="Format with cargo fmt", level=LogLevel.DEBUG)
 async def cargo_fmt(
-    request: CargoFmtRequest.Batch[str, RootMetadata], version: RustVersion, platform: Platform
+    request: CargoFmtRequest.Batch[str, RootMetadata], known: KnownPlatforms
 ) -> FmtResult:
     root = request.partition_metadata
     toolchain, sources = await concurrently(
-        install_rust_toolchain(
-            RustToolchainRequest(version.version, platform_triple(platform), version.components)
+        install_rust_toolchain(**implicitly()),
+        cargo_sources(
+            CargoSourcesRequest(
+                frozenset([root.root]),
+                include_packages=False,
+                platform=known.host,
+                dependent=root.root,
+            )
         ),
-        cargo_sources(CargoSourcesRequest(frozenset([root.root]), include_packages=False)),
     )
     # The batch's files come from the fmt chain (an earlier formatter may have changed them);
     # everything else cargo needs comes from the sources.

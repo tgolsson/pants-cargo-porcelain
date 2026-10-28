@@ -5,7 +5,9 @@ or the `rust-toolchain.toml` at the build root."""
 
 from __future__ import annotations
 
+import dataclasses
 import fcntl
+import logging
 import os
 import re
 import tomllib
@@ -18,10 +20,16 @@ from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.target import AllTargets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
+from pants_backend_platforms.subsystems import PlatformsSubsystem
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
-from pants_cargo_porcelain.subsystems import PLATFORM_TRIPLES, RustupTool
+from pants_cargo_porcelain.subsystems import RustupTool
+from pants_cargo_porcelain.util_rules.platform import platform_triple, rust_triple
+
+logger = logging.getLogger(__name__)
 
 RUSTUP_NAMED_CACHE = ".rustup-home"
 CARGO_NAMED_CACHE = ".cargo-home"
@@ -55,8 +63,9 @@ async def determine_rust_version(rustup: RustupTool) -> RustVersion:
         channel = toolchain.get("channel")
         components = tuple(toolchain.get("components", ()))
 
-    # One toolchain request per session, whatever the goal: a second `rustup` run while a
-    # cargo process executes a proxy in CARGO_HOME/bin fails with "text file busy".
+    # One toolchain request per session, whatever the goal (see `rust_toolchain_request`): a
+    # second `rustup` run while a cargo process executes a proxy in CARGO_HOME/bin fails with
+    # "text file busy".
     for component in ("clippy", "rustfmt"):
         if component not in components:
             components = (*components, component)
@@ -78,8 +87,36 @@ async def determine_rust_version(rustup: RustupTool) -> RustVersion:
 @dataclass(frozen=True)
 class RustToolchainRequest:
     version: str
-    target: str
+    targets: tuple[str, ...]
     components: tuple[str, ...] = ()
+
+
+def machine_toolchain_request(version: RustVersion, platform: Platform) -> RustToolchainRequest:
+    """Target generation's: it cannot wait for the `platform` targets, which wait for it."""
+    return RustToolchainRequest(version.version, (platform_triple(platform),), version.components)
+
+
+@rule(desc="Choose the Rust targets to install", level=LogLevel.DEBUG)
+async def rust_toolchain_request(
+    version: RustVersion,
+    known: KnownPlatforms,
+    platforms: PlatformsSubsystem,
+    platform: Platform,
+    # Waiting for every target orders this install after each generator's own install and
+    # `cargo metadata`, so the second `rustup` run of a session overlaps no cargo process.
+    all_targets: AllTargets,
+) -> RustToolchainRequest:
+    """Every enabled platform's target, built or not, so one install serves the session."""
+    machine = machine_toolchain_request(version, platform)
+    triples = []
+    for p in (known.host, *(known.get(n, "[platforms].enabled") for n in platforms.enabled)):
+        triple = rust_triple(p, all_targets)
+        if triple is None:
+            # Only a build for it needs one, and `rust_target` says so.
+            logger.debug(f"Not installing a Rust target for `{p.name}`: it has no triple.")
+        else:
+            triples.append(triple)
+    return dataclasses.replace(machine, targets=tuple(dict.fromkeys((*machine.targets, *triples))))
 
 
 @dataclass(frozen=True)
@@ -88,7 +125,7 @@ class RustToolchain:
 
     path: str
     version: str
-    target: str
+    targets: tuple[str, ...]
 
     @property
     def bin_dir(self) -> str:
@@ -157,10 +194,10 @@ async def install_rust_toolchain(
                         request.version,
                         "--no-self-update",
                         "--profile=minimal",
-                        f"--target={request.target}",
+                        *(f"--target={t}" for t in request.targets),
                         *components,
                     ],
-                    description=f"Install Rust {request.version} for {request.target}",
+                    description=f"Install Rust {request.version} for {', '.join(request.targets)}",
                     level=LogLevel.DEBUG,
                     append_only_caches=TOOLCHAIN_CACHES,
                     env=_TOOLCHAIN_ENV,
@@ -173,12 +210,8 @@ async def install_rust_toolchain(
     return RustToolchain(
         path=f"{RUSTUP_NAMED_CACHE}/toolchains/{request.version}-{host}",
         version=request.version,
-        target=request.target,
+        targets=request.targets,
     )
-
-
-def platform_triple(platform: Platform) -> str:
-    return PLATFORM_TRIPLES[platform.value]
 
 
 def rules():

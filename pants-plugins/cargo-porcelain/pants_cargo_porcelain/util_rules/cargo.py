@@ -9,33 +9,21 @@ compiled artefacts and kache keys do not depend on the sandbox path."""
 from __future__ import annotations
 
 import os
-import tomllib
 from dataclasses import dataclass
+from typing import Iterable
 
 from pants.core.util_rules.external_tool import download_external_tool
 from pants.core.util_rules.system_binaries import (
     BashBinary,
+    BinaryPath,
     BinaryPathRequest,
     BinaryShimsRequest,
     SystemBinariesSubsystem,
     create_binary_shims,
     find_binary,
 )
-from pants.engine.fs import (
-    EMPTY_DIGEST,
-    CreateDigest,
-    Digest,
-    DigestSubset,
-    FileContent,
-    MergeDigests,
-    PathGlobs,
-)
-from pants.engine.intrinsics import (
-    create_digest,
-    digest_subset_to_digest,
-    get_digest_contents,
-    merge_digests,
-)
+from pants.engine.fs import EMPTY_DIGEST, CreateDigest, Digest, FileContent, MergeDigests
+from pants.engine.intrinsics import create_digest, merge_digests
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
@@ -43,6 +31,7 @@ from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
 
 from pants_cargo_porcelain.subsystems import KacheTool
+from pants_cargo_porcelain.util_rules.platform import TOOLCHAIN_FINGERPRINT_ENV, toolchain_env_names
 from pants_cargo_porcelain.util_rules.rustup import (
     CARGO_NAMED_CACHE,
     RUSTUP_NAMED_CACHE,
@@ -75,28 +64,17 @@ _RESERVED_ENV = frozenset({
     "RUSTUP_HOME",
     "RUSTC_WRAPPER",
     "RUSTFLAGS",
+    TOOLCHAIN_FINGERPRINT_ENV,
 })
 
 
-def is_reserved_env(key: str) -> bool:
-    return key in _RESERVED_ENV or key.startswith("KACHE_")
-
-
-async def config_linkers(digest: Digest) -> tuple[str, ...]:
-    """The bare-name linkers the staged `.cargo/config.toml`s set per target (`linker =
-    "gcc"`, `"x86_64-w64-mingw32-gcc"`): cargo passes them to rustc by name, so they must be
-    on the sandbox PATH too."""
-    contents = await get_digest_contents(
-        await digest_subset_to_digest(DigestSubset(digest, PathGlobs(["**/.cargo/config.toml"])))
+def is_reserved_env(key: str, triples: Iterable[str]) -> bool:
+    """`triples` are those the process builds for, whose `cc_toolchain` variables it sets."""
+    return (
+        key in _RESERVED_ENV
+        or key.startswith("KACHE_")
+        or any(key in toolchain_env_names(t) for t in triples)
     )
-    names = set()
-    for file_content in contents:
-        config = tomllib.loads(file_content.content.decode())
-        for target in config.get("target", {}).values():
-            linker = target.get("linker") if isinstance(target, dict) else None
-            if isinstance(linker, str) and "/" not in linker:
-                names.add(linker)
-    return tuple(sorted(names))
 
 
 def manifest_path(spec_path: str) -> str:
@@ -118,6 +96,8 @@ class CargoProcessRequest:
     env: FrozenDict[str, str] = FrozenDict()
     script: str | None = None
     extra_shims: tuple[str, ...] = ()
+    tool_paths: tuple[BinaryPath, ...] = ()
+    """Shimmed onto PATH under their own names."""
     cache_scope: ProcessCacheScope = ProcessCacheScope.SUCCESSFUL
     level: LogLevel = LogLevel.DEBUG
 
@@ -140,19 +120,19 @@ async def make_cargo_process(
         ),
         **implicitly(),
     )
-    # Linkers from the cargo config and the optional tools are shimmed when the host has
-    # them; a linker for another target (the MinGW one on a Mac) is simply absent, and only
-    # a build for that target would miss it.
+    # The linker comes from the `cc_toolchain` (`CARGO_TARGET_<triple>_LINKER`), not from a
+    # `.cargo/config.toml` linker on PATH.
     optional_paths = await concurrently(
         find_binary(
             BinaryPathRequest(binary_name=name, search_path=system_binaries.system_binary_paths),
             **implicitly(),
         )
-        for name in (*_OPTIONAL, *await config_linkers(request.digest))
+        for name in _OPTIONAL
     )
     linkers = await create_binary_shims(
         BinaryShimsRequest.for_paths(
             *(paths.first_path for paths in optional_paths if paths.first_path),
+            *request.tool_paths,
             rationale="run cargo",
         ),
         **implicitly(),

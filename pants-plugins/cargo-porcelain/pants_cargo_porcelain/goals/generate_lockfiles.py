@@ -16,18 +16,13 @@ from pants.core.goals.generate_lockfiles import (
     UserGenerateLockfiles,
 )
 from pants.engine.addresses import Address
-from pants.engine.platform import Platform
 from pants.engine.process import ProcessCacheScope, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.unions import UnionRule
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
-from pants_cargo_porcelain.util_rules.rustup import (
-    RustToolchainRequest,
-    RustVersion,
-    install_rust_toolchain,
-    platform_triple,
-)
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
 from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
 from pants_cargo_porcelain.util_rules.workspace import AllCargoTargets, CargoPackageMapping
 
@@ -61,13 +56,16 @@ class GenerateCargoLockfileRequest(GenerateLockfile):
 
 @rule(desc="Generate a Cargo.lock")
 async def generate_cargo_lockfile(
-    request: GenerateCargoLockfileRequest, version: RustVersion, platform: Platform
+    request: GenerateCargoLockfileRequest, known: KnownPlatforms
 ) -> GenerateLockfileResult:
-    toolchain = await install_rust_toolchain(
-        RustToolchainRequest(version.version, platform_triple(platform), version.components)
-    )
+    toolchain = await install_rust_toolchain(**implicitly())
     sources = await cargo_sources(
-        CargoSourcesRequest(frozenset([request.root]), include_packages=False)
+        CargoSourcesRequest(
+            frozenset([request.root]),
+            include_packages=False,
+            platform=known.host,
+            dependent=request.root,
+        )
     )
     result = await fallible_to_exec_result_or_raise(
         **implicitly(

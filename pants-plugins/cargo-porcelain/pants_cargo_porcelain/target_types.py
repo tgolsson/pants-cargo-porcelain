@@ -14,6 +14,7 @@ from pants.engine.target import (
     generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import help_text
+from pants_backend_platforms.target_types import PlatformsField
 
 # ---------------------------------------------------------------------------
 # Workspace
@@ -85,8 +86,9 @@ class CargoEnvField(StringSequenceField):
         it, and those of its workspace; and of the test executables and `run` binaries those
         build. `{chroot}` expands to the sandbox root, so a staged dependency
         can be named: `env=["MYLIB_DIR={chroot}/build"]`. `PATH`, `CARGO_HOME`,
-        `RUSTUP_HOME`, `RUSTC_WRAPPER`, `RUSTFLAGS` and `KACHE_*` are set by the backend and
-        may not be set here.
+        `RUSTUP_HOME`, `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the C toolchain's
+        `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<triple>`, `CXX_<triple>` and `AR_<triple>` are
+        set by the backend and may not be set here.
         """)
 
 
@@ -117,6 +119,7 @@ _SHARED_FIELDS = (
     OutputPathField,
     EnvironmentField,
     CargoEnvField,
+    PlatformsField,
 )
 
 
@@ -170,6 +173,18 @@ class CargoTestTarget(Target):
     alias = "cargo_test"
     core_fields = _ARTIFACT_FIELDS
     help = "One `[[test]]` of the package, run by `test`."
+
+
+# ---------------------------------------------------------------------------
+# Platform
+# ---------------------------------------------------------------------------
+
+
+class RustTargetField(StringField):
+    alias = "rust_target"
+    help = (
+        "The Rust target triple cargo builds this platform as. Unset, derived from `os` and `arch`."
+    )
 
 
 def target_types():
