@@ -56,10 +56,15 @@ def rule_runner() -> RuleRunner:
     )
 
 
-def _sources(rule_runner: RuleRunner, include_packages: bool) -> tuple[CargoSources, list[str]]:
-    address = Address("hello", generated_name="package")
+def _sources(
+    rule_runner: RuleRunner,
+    include_packages: bool,
+    address: Address = Address("hello", generated_name="package"),
+    include_cargo_sources: bool = True,
+) -> tuple[CargoSources, list[str]]:
     sources = rule_runner.request(
-        CargoSources, [CargoSourcesRequest(frozenset([address]), include_packages)]
+        CargoSources,
+        [CargoSourcesRequest(frozenset([address]), include_packages, include_cargo_sources)],
     )
     contents = rule_runner.request(DigestContents, [sources.digest])
     return sources, [fc.path for fc in contents]
@@ -89,6 +94,31 @@ def test_packageable_dependency_is_staged_not_walked(rule_runner: RuleRunner) ->
     assert LIBRARY not in paths
     assert "third/header.h" not in paths
     assert sources.env == FrozenDict({"LIB_DIR": "{chroot}/build"})
+
+
+def test_other_members_bring_only_their_cargo_sources(rule_runner: RuleRunner) -> None:
+    files = {
+        "ws/Cargo.toml": '[workspace]\nresolver = "2"\nmembers = ["a", "b", "c"]\n',
+        "ws/BUILD": 'cargo_workspace(name="workspace")',
+        "lib/BUILD": "fake_lib()",
+    }
+    for name in ("a", "b", "c"):
+        files.update({f"ws/{k}": v for k, v in package_fixture(name).items()})
+    files["ws/a/Cargo.toml"] += '\n[dependencies]\nb = { path = "../b" }\n'
+    files["ws/c/BUILD"] = 'cargo_package(dependencies=["//lib"], env=["LIB_DIR={chroot}/build"])'
+    rule_runner.write_files(files)
+
+    a = Address("ws/a", generated_name="package")
+    sources, paths = _sources(rule_runner, True, a)
+    assert {"ws/Cargo.toml", "ws/b/src/lib.rs", "ws/c/Cargo.toml", "ws/c/src/lib.rs"} <= set(paths)
+    assert LIBRARY not in paths
+    assert sources.env == FrozenDict()
+    assert _sources(rule_runner, True, a, include_cargo_sources=False)[1] == []
+
+    for root in (Address("ws", target_name="workspace"), Address("ws/c", generated_name="package")):
+        sources, paths = _sources(rule_runner, True, root)
+        assert LIBRARY in paths
+        assert sources.env == FrozenDict({"LIB_DIR": "{chroot}/build"})
 
 
 @pytest.mark.parametrize("key", ["PATH", "RUSTFLAGS", "KACHE_BASE_DIR"])

@@ -58,3 +58,20 @@ def test_member_depends_on_workspace(rule_runner: RuleRunner) -> None:
     assert _infer(rule_runner, Address("ws/a", generated_name="package")) == InferredDependencies(
         FrozenOrderedSet([Address("ws", target_name="workspace")])
     )
+
+
+def test_infer_platform_specific_path_dependencies(rule_runner: RuleRunner) -> None:
+    files = {}
+    for name in ("a", "b", "c"):
+        files.update(package_fixture(name))
+    files["a/Cargo.toml"] += (
+        "\n[target.'cfg(unix)'.dependencies]\nb = { path = \"../b\" }\n"
+        "\n[target.'cfg(windows)'.build-dependencies]\nc = { path = \"../c\" }\n"
+    )
+    rule_runner.write_files(files)
+    assert _infer(rule_runner, Address("a", generated_name="package")) == InferredDependencies(
+        FrozenOrderedSet([
+            Address("b", generated_name="package"),
+            Address("c", generated_name="package"),
+        ])
+    )

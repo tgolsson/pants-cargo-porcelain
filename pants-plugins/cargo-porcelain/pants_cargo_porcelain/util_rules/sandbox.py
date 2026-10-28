@@ -2,7 +2,8 @@
 `files`/`resources` in it, and, when asked for, the `package` output of any packageable target
 in it (a library another backend builds, for example), staged at its package path. The closure
 stops at such a target: its own dependencies are its backend's inputs, not cargo's. A workspace
-root brings its member packages, which do not depend on it in the graph."""
+root brings its member packages, which do not depend on it in the graph. A workspace reached
+otherwise brings only its other members' cargo sources: cargo loads every member."""
 
 from __future__ import annotations
 
@@ -51,6 +52,9 @@ class CargoSourcesRequest:
     include_packages: bool
     """Whether to build the packageable targets in the closure and stage their outputs: what
     compiles needs them, `cargo fmt` and `cargo update` do not."""
+    include_cargo_sources: bool = True
+    """Whether to include the closure's cargo sources: `run` needs only its files, packages and
+    `env`."""
 
 
 @dataclass(frozen=True)
@@ -115,6 +119,10 @@ class _StopAtPackages(ShouldTraverseDepsPredicate):
         return DepsTraversalBehavior.INCLUDE
 
 
+def _members(mapping: CargoPackageMapping, addresses: Iterable[Address]) -> set[Address]:
+    return {m.package.address for a in addresses for m in mapping.workspace_to_packages.get(a, ())}
+
+
 @rule(desc="Collect the sources of a cargo build")
 async def cargo_sources(
     request: CargoSourcesRequest,
@@ -122,32 +130,31 @@ async def cargo_sources(
     union_membership: UnionMembership,
 ) -> CargoSources:
     predicate = _StopAtPackages(tuple(union_membership.get(PackageFieldSet)))
-    # cargo loads every member's manifest whenever a workspace is involved, so a workspace
-    # in the closure (as a root, or as a member's dependency) brings all its members.
-    roots = set(request.addresses)
+    roots = set(request.addresses) | _members(mapping, request.addresses)
     closure = await transitive_targets(
         TransitiveTargetsRequest(sorted(roots), should_traverse_deps_predicate=predicate),
         **implicitly(),
     )
-    members = {
-        m.package.address
-        for tgt in closure.closure
-        if tgt.address in mapping.workspace_to_packages
-        for m in mapping.workspace_to_packages[tgt.address]
-    }
-    if not members <= roots:
-        roots |= members
-        closure = await transitive_targets(
-            TransitiveTargetsRequest(sorted(roots), should_traverse_deps_predicate=predicate),
-            **implicitly(),
-        )
+    in_closure = {tgt.address for tgt in closure.closure}
+    others = _members(mapping, in_closure) - in_closure
+    loaded: Iterable[Target] = ()
+    if request.include_cargo_sources and others:
+        loaded = (
+            await transitive_targets(
+                TransitiveTargetsRequest(sorted(others), should_traverse_deps_predicate=predicate),
+                **implicitly(),
+            )
+        ).closure
 
-    source_fields = []
+    source_fields = [
+        tgt[field] for tgt in loaded for field in _CARGO_FIELDS if tgt.has_field(field)
+    ]
     packageable = []
     for tgt in closure.closure:
         cargo_field = next((f for f in _CARGO_FIELDS if tgt.has_field(f)), None)
         if cargo_field is not None:
-            source_fields.append(tgt[cargo_field])
+            if request.include_cargo_sources:
+                source_fields.append(tgt[cargo_field])
         elif tgt.has_field(FileSourceField):
             source_fields.append(tgt[FileSourceField])
         elif tgt.has_field(ResourceSourceField):

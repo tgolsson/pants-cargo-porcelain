@@ -1,5 +1,5 @@
-"""`pants run` of a `cargo_binary`: the packaged binary, run from the sandbox with the build's
-sources, staged packages and `env`."""
+"""`pants run` of a `cargo_binary`: the packaged binary, with the `files`/`resources`, staged
+packages and `env` of its closure; no cargo sources."""
 
 from __future__ import annotations
 
@@ -18,7 +18,11 @@ from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_
 async def create_cargo_binary_run_request(field_set: CargoBinaryFieldSet) -> RunRequest:
     built, sources = await concurrently(
         package_cargo_binary(field_set, **implicitly()),
-        cargo_sources(CargoSourcesRequest(frozenset([field_set.address]), include_packages=True)),
+        cargo_sources(
+            CargoSourcesRequest(
+                frozenset([field_set.address]), include_packages=True, include_cargo_sources=False
+            )
+        ),
     )
     relpath = built.artifacts[0].relpath
     assert relpath is not None

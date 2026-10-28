@@ -60,7 +60,8 @@ linker` is.
 
 - `package`: `cargo build --locked --bin <name>` (`--release` with `[rust].release`), the
   binary at `dist/<path.to.target>/<name>` or under `output_path`.
-- `run`: the packaged binary, in a sandbox with the build's sources and staged packages.
+- `run`: the packaged binary, with the `files`, `resources` and staged packages of its closure,
+  but not its cargo sources.
 - `test`: one `cargo test --no-run --workspace` per workspace (or per package outside any),
   then one process per test executable, so each `cargo_library`, `cargo_binary` and
   `cargo_test` is its own cached test result. Doctests are not run. The executables run from

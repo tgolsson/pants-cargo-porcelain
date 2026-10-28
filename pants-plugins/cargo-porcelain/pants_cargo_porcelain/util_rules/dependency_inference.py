@@ -1,6 +1,7 @@
 """Inferred dependencies: a package depends on its workspace (its manifest, lockfile and config)
-and on the packages its `path` dependencies name. A workspace does not depend on its members
-(that would be a cycle); the sandbox rule adds them when a workspace is the root."""
+and on the packages its `path` dependencies name, platform-specific ones included. A workspace
+does not depend on its members (that would be a cycle); the sandbox rule adds them when a
+workspace is the root."""
 
 from __future__ import annotations
 
@@ -45,6 +46,11 @@ class InferCargoDependencies(InferDependenciesRequest):
 _DEPENDENCY_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 
 
+def _dependency_tables(manifest: dict) -> list[dict]:
+    platforms = manifest.get("target", {}).values()
+    return [scope.get(name, {}) for scope in (manifest, *platforms) for name in _DEPENDENCY_TABLES]
+
+
 @rule(desc="Infer a cargo package's dependencies")
 async def infer_cargo_dependencies(
     request: InferCargoDependencies, mapping: CargoPackageMapping
@@ -67,8 +73,8 @@ async def infer_cargo_dependencies(
 
     for file_content in contents:
         manifest = tomllib.loads(file_content.content.decode())
-        for table in _DEPENDENCY_TABLES:
-            for dependency in manifest.get(table, {}).values():
+        for table in _dependency_tables(manifest):
+            for dependency in table.values():
                 if not isinstance(dependency, dict) or "path" not in dependency:
                     continue
                 directory = os.path.normpath(os.path.join(address.spec_path, dependency["path"]))
