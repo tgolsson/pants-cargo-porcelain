@@ -74,8 +74,9 @@ cargo_package(platforms=["linux-x86_64", "windows-x86_64"])
   (`x86_64-unknown-linux-gnu`, `aarch64-unknown-linux-gnu`, `x86_64-pc-windows-gnu`,
   `aarch64-apple-darwin`, `x86_64-apple-darwin`). Every enabled platform's target is installed
   with the toolchain. Another platform's build passes `--target`; the host's does not.
-- The platform's `cc_toolchain` links the binary and is cc-rs's compiler for that triple,
-  host included; a cross build also gets the host's for its build scripts and proc macros.
+- The platform's `cc_toolchain` ([pants-backend-cc](https://github.com/tgolsson/pants-backends))
+  links the binary and is cc-rs's compiler for that triple, host included; a cross build also
+  gets the host's for its build scripts and proc macros.
 - A packageable dependency of another backend that builds for platforms (a `cmake_target`)
   is built for the same platform, and must list it in its own `platforms`. Cargo packages
   that a binary depends on need no `platforms` of their own.
@@ -122,3 +123,5 @@ enabled = true  # the default; false runs rustc bare
 ```
 
 Linux and macOS. With no `cc_toolchain` targets, the host's `gcc`, `g++` and `ar` link.
+Declaring `platform` and `cc_toolchain` targets needs `pants_backend_platforms` and
+`pants_backend_cc` in `backend_packages` as well; the porcelain installs both.

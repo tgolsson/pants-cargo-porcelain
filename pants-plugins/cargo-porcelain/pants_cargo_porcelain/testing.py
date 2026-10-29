@@ -16,6 +16,7 @@ from pants.engine.rules import QueryRule, Rule
 from pants.engine.target import Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_cc.target_types import CcToolchainTarget
 from pants_backend_platforms import register as platforms_register
 from pants_backend_platforms.testutil import HOST, HOST_ARCH, HOST_OS
 from pants_backend_platforms.util_rules.platforms import TargetPlatform
@@ -52,6 +53,7 @@ def make_rule_runner(
         target_types=[
             *register.target_types(),
             *platforms_register.target_types(),
+            CcToolchainTarget,
             FilesGeneratorTarget,
             *target_types,
         ],

@@ -1,5 +1,6 @@
 """What building for a `platform` (pants-backends' pants_backend_platforms) means to cargo: the
-Rust target triple, and the `cc_toolchain` that links for it and compiles cc-rs's C."""
+Rust target triple, and the `cc_toolchain` (pants_backend_cc) that links for it and compiles
+cc-rs's C."""
 
 from __future__ import annotations
 
@@ -17,13 +18,13 @@ from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets
 from pants.util.frozendict import FrozenDict
 from pants.util.logging import LogLevel
-from pants_backend_platforms.target_types import PlatformTarget
-from pants_backend_platforms.util_rules.platforms import KnownPlatforms, TargetPlatform
-from pants_backend_platforms.util_rules.toolchain import (
+from pants_backend_cc.util_rules.toolchain import (
     CcToolchain,
     CcToolchainRequest,
     resolve_cc_toolchain,
 )
+from pants_backend_platforms.target_types import PlatformTarget
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms, TargetPlatform
 
 from pants_cargo_porcelain.subsystems import DEFAULT_TRIPLES, PLATFORM_TRIPLES
 from pants_cargo_porcelain.target_types import RustTargetField

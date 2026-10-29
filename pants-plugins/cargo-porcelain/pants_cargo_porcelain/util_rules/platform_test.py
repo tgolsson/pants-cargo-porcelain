@@ -13,6 +13,7 @@ from pants.engine.platform import Platform
 from pants.engine.process import Process
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
+from pants_backend_cc.testutil import toolchains_build
 from pants_backend_platforms.testutil import HOST, OTHER, platforms_build
 from pants_backend_platforms.util_rules.platforms import KnownPlatforms, TargetPlatform
 
@@ -57,7 +58,7 @@ def _triple(rule_runner: RuleRunner, platform: TargetPlatform) -> str:
 def test_rust_target_from_os_and_arch_or_the_field(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
         "BUILD": (
-            platforms_build(toolchains=False)
+            platforms_build()
             + 'platform(name="llvm", os="windows", arch="x86_64", '
             + 'rust_target="x86_64-pc-windows-gnullvm")\n'
             + NO_TRIPLE
@@ -87,7 +88,7 @@ def test_cross_toolchain_env(rule_runner: RuleRunner) -> None:
     # Every tool is `bash` but the cross archiver, so the two fingerprints differ.
     rule_runner.write_files({
         "BUILD": (
-            platforms_build(toolchains=False)
+            platforms_build()
             + f'cc_toolchain(name="h", host="{HOST}", target="{HOST}", cc="bash", cxx="bash", '
             + 'ar="bash")\n'
             + f'cc_toolchain(name="w", host="{HOST}", target="{OTHER}", cc="bash", cxx="bash", '
@@ -125,7 +126,7 @@ def test_dlltool_next_to_the_windows_gnu_compiler(rule_runner: RuleRunner, tmp_p
         tool.chmod(0o755)
     gcc = tmp_path / "x86_64-w64-mingw32-gcc-win32"
     build = (
-        platforms_build(toolchains=False)
+        platforms_build()
         + f'cc_toolchain(name="w", host="{HOST}", target="{OTHER}", cc="{gcc}", cxx="{gcc}", '
         'ar="bash")\n'
         f'cc_toolchain(name="h", host="{HOST}", target="{HOST}", cc="{gcc}", cxx="{gcc}", '
@@ -148,7 +149,7 @@ def _shims(rule_runner: RuleRunner, process: Process) -> set[str]:
 
 
 def test_host_process_is_unchanged_but_for_the_toolchain(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": platforms_build()})
+    rule_runner.write_files({"BUILD": platforms_build() + toolchains_build()})
     host = rule_runner.request(CargoPlatform, [CargoPlatformRequest(HOST_PLATFORM)])
     toolchain = RustToolchain("tc", RUST_VERSION, (MACHINE_TRIPLE,))
     bare = rule_runner.request(Process, [CargoProcessRequest(toolchain, ("build",), "build")])
@@ -164,7 +165,7 @@ def test_host_process_is_unchanged_but_for_the_toolchain(rule_runner: RuleRunner
 
 
 def test_one_install_covers_every_enabled_platform(rule_runner: RuleRunner) -> None:
-    rule_runner.write_files({"BUILD": platforms_build(toolchains=False) + NO_TRIPLE})
+    rule_runner.write_files({"BUILD": platforms_build() + NO_TRIPLE})
     version = rule_runner.request(RustVersion, [])
     machine = machine_toolchain_request(version, Platform.create_for_localhost())
     # Nothing enabled: what target generation installs, so a session installs once.

@@ -1,3 +1,4 @@
+from pants_backend_cc.util_rules import toolchain as cc_toolchain
 from pants_backend_platforms import register as platforms
 
 from pants_cargo_porcelain import subsystems, target_generator
@@ -17,6 +18,7 @@ from pants_cargo_porcelain.util_rules import (
 def rules():
     return [
         *platforms.rules(),
+        *cc_toolchain.rules(),
         *subsystems.rules(),
         *platform.rules(),
         *rustup.rules(),

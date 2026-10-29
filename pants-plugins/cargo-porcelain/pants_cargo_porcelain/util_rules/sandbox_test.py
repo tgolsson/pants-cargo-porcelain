@@ -17,6 +17,7 @@ from pants.engine.target import COMMON_TARGET_FIELDS, Dependencies, Target
 from pants.engine.unions import UnionRule
 from pants.testutil.rule_runner import RuleRunner
 from pants.util.frozendict import FrozenDict
+from pants_backend_cc.testutil import toolchains_build
 from pants_backend_platforms import testutil
 from pants_backend_platforms.target_types import PlatformsField
 from pants_backend_platforms.testutil import HOST, OTHER, platforms_build
@@ -178,26 +179,26 @@ def _contents(rule_runner: RuleRunner, platform: TargetPlatform) -> dict[str, by
 def test_platform_dependency_is_built_for_the_platform(rule_runner: RuleRunner) -> None:
     files = package_fixture("hello")
     files["hello/BUILD"] = 'cargo_package(dependencies=["//lib", "//fake"])'
-    files["BUILD"] = platforms_build()
+    files["BUILD"] = platforms_build() + toolchains_build()
     files["lib/BUILD"] = f'toy_artifact(text="lib", platforms=["{HOST}", "{OTHER}"])'
     files["fake/BUILD"] = "fake_lib()"
     rule_runner.write_files(files)
 
     contents = _contents(rule_runner, TargetPlatform(OTHER, "windows", "x86_64"))
-    assert contents["lib/lib.exe.txt"].startswith(f"lib for {OTHER} with bash".encode())
+    assert contents["lib/lib.exe.txt"].startswith(f"lib for {OTHER}\n".encode())
     assert "lib/lib.txt" not in contents
     # A backend without platforms is packaged for the host.
     assert LIBRARY in contents
 
     contents = _contents(rule_runner, HOST_PLATFORM)
-    assert contents["lib/lib.txt"].startswith(f"lib for {HOST} with bash".encode())
+    assert contents["lib/lib.txt"].startswith(f"lib for {HOST}\n".encode())
     assert "lib/lib.exe.txt" not in contents
 
 
 def test_platform_dependency_must_list_the_platform(rule_runner: RuleRunner) -> None:
     files = package_fixture("hello")
     files["hello/BUILD"] = 'cargo_package(dependencies=["//lib"])'
-    files["BUILD"] = platforms_build()
+    files["BUILD"] = platforms_build() + toolchains_build()
     files["lib/BUILD"] = f'toy_artifact(text="lib", platforms=["{HOST}"])'
     rule_runner.write_files(files)
     with pytest.raises(
