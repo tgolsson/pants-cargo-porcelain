@@ -6,17 +6,20 @@ or the `rust-toolchain.toml` at the build root."""
 from __future__ import annotations
 
 import dataclasses
-import fcntl
 import logging
-import os
 import re
 import tomllib
 from dataclasses import dataclass
 
-from pants.base.build_environment import get_pants_cachedir
+from pants.core.util_rules.adhoc_binaries import PythonBuildStandaloneBinary
 from pants.core.util_rules.external_tool import download_external_tool
-from pants.engine.fs import PathGlobs
-from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
+from pants.engine.fs import CreateDigest, FileContent, MergeDigests, PathGlobs
+from pants.engine.intrinsics import (
+    create_digest,
+    get_digest_contents,
+    merge_digests,
+    path_globs_to_digest,
+)
 from pants.engine.platform import Platform
 from pants.engine.process import Process, ProcessCacheScope, fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, implicitly, rule
@@ -136,75 +139,75 @@ class RustToolchain:
         return f"{self.bin_dir}/cargo"
 
 
-class _FileLock:
-    """Serialises toolchain installs across Pants sessions: the engine runs one install per
-    request per session, but two sessions on one machine share the named cache."""
+# Runs its commands, separated by `--`, holding an exclusive lock on its first argument: two
+# Pants sessions on one machine share the named cache. Waiting happens here, in the process,
+# never on an engine thread.
+_LOCKED_INSTALL = """\
+import fcntl, subprocess, sys
 
-    def __init__(self, path: str):
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        self._fd = os.open(path, os.O_RDWR | os.O_CREAT)
-
-    def __enter__(self):
-        fcntl.flock(self._fd, fcntl.LOCK_EX)
-        return self
-
-    def __exit__(self, *exc):
-        fcntl.flock(self._fd, fcntl.LOCK_UN)
-        os.close(self._fd)
+with open(sys.argv[1], "a") as lock:
+    fcntl.flock(lock, fcntl.LOCK_EX)
+    commands = [[]]
+    for arg in sys.argv[2:]:
+        if arg == "--":
+            commands.append([])
+        else:
+            commands[-1].append(arg)
+    for command in commands:
+        code = subprocess.call(command)
+        if code:
+            sys.exit(code)
+"""
 
 
 @rule(desc="Install the Rust toolchain", level=LogLevel.DEBUG)
 async def install_rust_toolchain(
-    request: RustToolchainRequest, rustup: RustupTool, platform: Platform
+    request: RustToolchainRequest,
+    rustup: RustupTool,
+    platform: Platform,
+    python: PythonBuildStandaloneBinary,
 ) -> RustToolchain:
     rustup_init = await download_external_tool(rustup.get_request(platform))
     components = [f"--component={c}" for c in request.components]
 
-    # rustup is idempotent and quick when everything is installed, so these run once per
-    # session rather than being memoised forever: a process-cache hit must not be able to
-    # claim a toolchain that a wiped named cache no longer holds.
-    with _FileLock(os.path.join(get_pants_cachedir(), "locks", "rustup")):
-        await fallible_to_exec_result_or_raise(
-            **implicitly(
-                Process(
-                    argv=[
-                        rustup_init.exe,
-                        "-y",
-                        "--no-modify-path",
-                        "--no-update-default-toolchain",
-                        "--default-toolchain=none",
-                        "--profile=minimal",
-                    ],
-                    input_digest=rustup_init.digest,
-                    description="Install rustup",
-                    level=LogLevel.DEBUG,
-                    append_only_caches=TOOLCHAIN_CACHES,
-                    env=_TOOLCHAIN_ENV,
-                    cache_scope=ProcessCacheScope.PER_SESSION,
-                )
+    script = await create_digest(
+        CreateDigest([FileContent("locked_install.py", _LOCKED_INSTALL.encode())])
+    )
+    # rustup is idempotent and quick when everything is installed, so this runs once per session
+    # rather than being memoised forever: a process-cache hit must not be able to claim a
+    # toolchain that a wiped named cache no longer holds.
+    await fallible_to_exec_result_or_raise(
+        **implicitly(
+            Process(
+                argv=[
+                    python.path,
+                    "locked_install.py",
+                    f"{CARGO_NAMED_CACHE}/.pants-install.lock",
+                    rustup_init.exe,
+                    "-y",
+                    "--no-modify-path",
+                    "--no-update-default-toolchain",
+                    "--default-toolchain=none",
+                    "--profile=minimal",
+                    "--",
+                    f"{{chroot}}/{CARGO_NAMED_CACHE}/bin/rustup",
+                    "toolchain",
+                    "install",
+                    request.version,
+                    "--no-self-update",
+                    "--profile=minimal",
+                    *(f"--target={t}" for t in request.targets),
+                    *components,
+                ],
+                input_digest=await merge_digests(MergeDigests([rustup_init.digest, script])),
+                description=f"Install Rust {request.version} for {', '.join(request.targets)}",
+                level=LogLevel.DEBUG,
+                append_only_caches={**TOOLCHAIN_CACHES, **python.APPEND_ONLY_CACHES},
+                env=_TOOLCHAIN_ENV,
+                cache_scope=ProcessCacheScope.PER_SESSION,
             )
         )
-        await fallible_to_exec_result_or_raise(
-            **implicitly(
-                Process(
-                    argv=[
-                        f"{{chroot}}/{CARGO_NAMED_CACHE}/bin/rustup",
-                        "toolchain",
-                        "install",
-                        request.version,
-                        "--no-self-update",
-                        "--profile=minimal",
-                        *(f"--target={t}" for t in request.targets),
-                        *components,
-                    ],
-                    description=f"Install Rust {request.version} for {', '.join(request.targets)}",
-                    level=LogLevel.DEBUG,
-                    append_only_caches=TOOLCHAIN_CACHES,
-                    env=_TOOLCHAIN_ENV,
-                    cache_scope=ProcessCacheScope.PER_SESSION,
-                )
-            )
-        )
+    )
 
     host = platform_triple(platform)
     return RustToolchain(

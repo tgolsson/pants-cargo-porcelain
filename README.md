@@ -11,7 +11,10 @@ stability guarantees until it nears feature completeness.
 
 - `cargo_workspace`: the root of a Cargo workspace: `Cargo.toml`, `Cargo.lock`,
   `rust-toolchain.toml` and `.cargo/config.toml`. Members are found through the manifest's
-  `members` and depend on it. Test executables and clippy run once per workspace.
+  `members` (globs one path segment at a time, less `exclude`) and depend on it. Test
+  executables and clippy run once per workspace. Members cannot inherit from the workspace
+  (`version.workspace = true`, `b = { workspace = true }`): a package's targets are generated
+  from its own manifest alone.
 - `cargo_package`: a package. `cargo metadata` on its manifest generates
   - `path:name#package` (`cargo_package_impl`): the sources and cargo dependencies, what
     `fmt` and `lint` act on;

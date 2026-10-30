@@ -2,16 +2,14 @@
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import tomllib
 from dataclasses import dataclass
 
-from pants.base.specs import DirGlobSpec, RawSpecs
 from pants.build_graph.address import Address
-from pants.engine.addresses import Addresses
 from pants.engine.fs import DigestSubset, PathGlobs
-from pants.engine.internals.graph import hydrate_sources, resolve_targets
-from pants.engine.internals.specs_rules import resolve_addresses_from_raw_specs
+from pants.engine.internals.graph import hydrate_sources
 from pants.engine.intrinsics import digest_subset_to_digest, get_digest_contents
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import AllTargets, HydrateSourcesRequest, MultipleSourcesField
@@ -89,6 +87,12 @@ class CargoPackageMapping:
         return None
 
 
+def _matches(relative: str, pattern: str) -> bool:
+    """`pattern` matches one path segment at a time, as cargo expands `members`."""
+    parts, wanted = relative.split("/"), os.path.normpath(pattern).split("/")
+    return len(parts) == len(wanted) and all(map(fnmatch.fnmatchcase, parts, wanted))
+
+
 @rule(desc="Assign packages to workspaces")
 async def assign_packages_to_workspaces(all_cargo_targets: AllCargoTargets) -> CargoPackageMapping:
     manifests = await concurrently(
@@ -96,40 +100,33 @@ async def assign_packages_to_workspaces(all_cargo_targets: AllCargoTargets) -> C
         for workspace in all_cargo_targets.workspaces
     )
 
+    by_dir: dict[str, list[CargoPackageTargetImpl]] = {}
+    for package in all_cargo_targets.packages:
+        by_dir.setdefault(package.address.spec_path, []).append(package)
+
     workspace_to_packages: dict[Address, frozenset[CargoWorkspaceMember]] = {}
     packages = set(all_cargo_targets.packages)
     for workspace, manifest in zip(all_cargo_targets.workspaces, manifests):
         data = tomllib.loads(manifest.contents)
-        members = list(data.get("workspace", {}).get("members", []))
-        if "package" in data:
-            members.append(".")
-        globs = [os.path.normpath(os.path.join(workspace.address.spec_path, m)) for m in members]
-
-        address_sets = await concurrently(
-            resolve_addresses_from_raw_specs(
-                RawSpecs(
-                    dir_globs=(DirGlobSpec(glob),),
-                    description_of_origin=f"the members of {workspace.address}",
-                )
-            )
-            for glob in globs
-        )
-        candidates = await concurrently(
-            resolve_targets(**implicitly({addresses: Addresses})) for addresses in address_sets
-        )
+        table = data.get("workspace", {})
+        members = [*table.get("members", []), *(["."] if "package" in data else [])]
+        exclude = table.get("exclude", [])
+        root = workspace.address.spec_path
 
         found = []
-        for member, targets in zip(members, candidates):
-            package_targets = [t for t in targets if t.has_field(_CargoPackageMarker)]
+        for directory, package_targets in sorted(by_dir.items()):
+            relative = os.path.relpath(directory or ".", root or ".")
+            if relative.startswith("..") or not any(_matches(relative, m) for m in members):
+                continue
+            if any(_matches(relative, e) for e in exclude):
+                continue
             if len(package_targets) > 1:
                 raise ValueError(
-                    f"{workspace.address}: member `{member}` has more than one package target: "
+                    f"{workspace.address}: member `{relative}` has more than one package target: "
                     f"{sorted(t.address for t in package_targets)}"
                 )
-            if not package_targets:
-                continue
             packages -= set(package_targets)
-            found.append(CargoWorkspaceMember(member_path=member, package=package_targets[0]))
+            found.append(CargoWorkspaceMember(member_path=relative, package=package_targets[0]))
         workspace_to_packages[workspace.address] = frozenset(found)
 
     return CargoPackageMapping(

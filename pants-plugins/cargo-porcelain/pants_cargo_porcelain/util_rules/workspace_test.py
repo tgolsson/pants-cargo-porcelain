@@ -75,6 +75,32 @@ def test_member_manifests_among_the_sources(rule_runner: RuleRunner) -> None:
     assert mapping.workspace_for(core.address) == Address("ws", target_name="workspace")
 
 
+def test_glob_members_and_exclude(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({
+        "ws/Cargo.toml": (
+            '[workspace]\nresolver = "2"\nmembers = ["crates/*"]\nexclude = ["crates/skip"]\n'
+        ),
+        "ws/Cargo.lock": "version = 4\n",
+        "ws/BUILD": 'cargo_workspace(name="workspace")',
+        **{
+            k.replace(f"{name}/", f"ws/crates/{name}/", 1): v
+            for name in ("a", "b", "skip")
+            for k, v in package_fixture(name).items()
+        },
+        # Below a matched directory, not matched by `crates/*`.
+        **{
+            k.replace("deep/", "ws/crates/a/deep/", 1): v
+            for k, v in package_fixture("deep").items()
+        },
+    })
+    mapping = rule_runner.request(CargoPackageMapping, [])
+    ws = Address("ws", target_name="workspace")
+    for member in ("a", "b"):
+        assert mapping.workspace_for(Address(f"ws/crates/{member}", generated_name="package")) == ws
+    for loose in ("ws/crates/skip", "ws/crates/a/deep"):
+        assert mapping.workspace_for(Address(loose, generated_name="package")) is None
+
+
 def test_root_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
         "ws/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',
