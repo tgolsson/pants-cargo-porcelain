@@ -99,16 +99,14 @@ class CargoPlatform:
     """What rustc runs by name for this target, to shim onto PATH."""
 
     @property
-    def cross(self) -> bool:
-        return self.target.triple != self.machine_triple
-
-    @property
     def env(self) -> FrozenDict[str, str]:
         """The target's toolchain under its triple and, in a cross build, the host's under the
         machine's, which build scripts and proc macros are built for. PATH stays cargo's own."""
-        pairs = dict.fromkeys(((self.target.triple, self.cc), (self.machine_triple, self.host_cc)))
+        # A native build for a platform with its own toolchain keeps that toolchain.
+        toolchains = {self.target.triple: self.cc}
+        toolchains.setdefault(self.machine_triple, self.host_cc)
         env = {}
-        for triple, cc in pairs:
+        for triple, cc in toolchains.items():
             under = triple.replace("-", "_")
             env.update({
                 f"CARGO_TARGET_{under.upper()}_LINKER": cc.cc.path,
@@ -116,7 +114,9 @@ class CargoPlatform:
                 f"CXX_{under}": cc.cxx.path,
                 f"AR_{under}": cc.ar.path,
             })
-        fingerprints = dict.fromkeys(cc.env[TOOLCHAIN_FINGERPRINT_ENV] for _, cc in pairs)
+        fingerprints = dict.fromkeys(
+            cc.env[TOOLCHAIN_FINGERPRINT_ENV] for cc in toolchains.values()
+        )
         env[TOOLCHAIN_FINGERPRINT_ENV] = ";".join(fingerprints)
         return FrozenDict(env)
 

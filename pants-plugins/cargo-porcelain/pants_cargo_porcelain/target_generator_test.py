@@ -7,7 +7,7 @@ from pants.build_graph.address import Address
 from pants.engine.internals.scheduler import ExecutionError
 from pants.testutil.rule_runner import RuleRunner
 
-from pants_cargo_porcelain.target_types import SkipCargoTestsField
+from pants_cargo_porcelain.target_types import CargoPackageNameField, SkipCargoTestsField
 from pants_cargo_porcelain.testing import make_rule_runner, package_fixture
 
 
@@ -54,3 +54,24 @@ def test_generated_name_collisions(rule_runner: RuleRunner, extra: str, message:
     rule_runner.write_files(files)
     with pytest.raises(ExecutionError, match=message):
         rule_runner.get_target(Address("pkg", generated_name="library"))
+
+
+def test_workspace_root_package_is_its_own(rule_runner: RuleRunner) -> None:
+    # The member is in the root's sources so `cargo metadata` can load it, and comes first
+    # in `members`.
+    rule_runner.write_files({
+        "ws/BUILD": 'cargo_package(sources=["Cargo.toml", "Cargo.lock", "src/*", "a/**/*"])',
+        "ws/Cargo.toml": (
+            '[package]\nname = "root"\nversion = "0.1.0"\nedition = "2021"\n\n'
+            '[workspace]\nmembers = ["a"]\n'
+        ),
+        "ws/Cargo.lock": (
+            'version = 4\n\n[[package]]\nname = "a"\nversion = "0.1.0"\n\n'
+            '[[package]]\nname = "root"\nversion = "0.1.0"\n'
+        ),
+        "ws/src/lib.rs": "",
+        "ws/a/Cargo.toml": '[package]\nname = "a"\nversion = "0.1.0"\nedition = "2021"\n',
+        "ws/a/src/lib.rs": "",
+    })
+    package = rule_runner.get_target(Address("ws", generated_name="package"))
+    assert package[CargoPackageNameField].value == "root"

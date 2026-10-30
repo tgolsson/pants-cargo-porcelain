@@ -14,7 +14,7 @@ from pants.engine.internals.graph import hydrate_sources, resolve_targets
 from pants.engine.internals.specs_rules import resolve_addresses_from_raw_specs
 from pants.engine.intrinsics import digest_subset_to_digest, get_digest_contents
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
-from pants.engine.target import AllTargets, HydrateSourcesRequest, MultipleSourcesField, Target
+from pants.engine.target import AllTargets, HydrateSourcesRequest, MultipleSourcesField
 from pants.util.frozendict import FrozenDict
 
 from pants_cargo_porcelain.target_types import (
@@ -82,21 +82,6 @@ class CargoPackageMapping:
             if any(address == m.package.address for m in members):
                 return workspace
         return None
-
-    def is_workspace_member(self, target: Target) -> bool:
-        return self.workspace_for(target.address) is not None
-
-    def get_workspace_for_package(self, target: Target) -> Address:
-        workspace = self.workspace_for(target.address)
-        if workspace is None:
-            raise ValueError(f"target {target.address} is not a workspace member")
-        return workspace
-
-    def get_workspace_members(self, address: Address) -> tuple[CargoWorkspaceMember, ...]:
-        try:
-            return tuple(self.workspace_to_packages[address])
-        except KeyError:
-            raise ValueError(f"target {address} is not a workspace") from None
 
 
 @rule(desc="Assign packages to workspaces")

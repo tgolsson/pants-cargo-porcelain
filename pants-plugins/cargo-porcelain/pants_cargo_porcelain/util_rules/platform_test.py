@@ -14,7 +14,7 @@ from pants.engine.process import Process
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 from pants_backend_cc.testutil import toolchains_build
-from pants_backend_platforms.testutil import HOST, OTHER, platforms_build
+from pants_backend_platforms.testutil import HOST, HOST_ARCH, HOST_OS, OTHER, platforms_build
 from pants_backend_platforms.util_rules.platforms import KnownPlatforms, TargetPlatform
 
 from pants_cargo_porcelain.testing import HOST_PLATFORM, RUST_VERSION, make_rule_runner
@@ -97,7 +97,8 @@ def test_cross_toolchain_env(rule_runner: RuleRunner) -> None:
     })
     cross = rule_runner.request(CargoPlatform, [CargoPlatformRequest(WINDOWS)])
     host = rule_runner.request(CargoPlatform, [CargoPlatformRequest(HOST_PLATFORM)])
-    assert cross.cross and not host.cross
+    assert cross.target.triple != cross.machine_triple
+    assert host.target.triple == host.machine_triple
 
     env = dict(cross.env)
     fingerprint = env.pop("__PANTS_CC_TOOLCHAIN")
@@ -117,6 +118,29 @@ def test_cross_toolchain_env(rule_runner: RuleRunner) -> None:
     assert host.tools == ()
     # From the search path, when the machine has MinGW.
     assert {os.path.basename(t.path) for t in cross.tools} <= {"x86_64-w64-mingw32-dlltool"}
+
+
+def test_native_platform_keeps_its_own_toolchain(rule_runner: RuleRunner) -> None:
+    # A second platform for the machine itself, whose toolchain differs from the host's in its
+    # archiver: its toolchain, not the host's, is the one under the machine's triple.
+    rule_runner.write_files({
+        "BUILD": (
+            platforms_build()
+            + f'platform(name="native", os="{HOST_OS}", arch="{HOST_ARCH}")\n'
+            + f'cc_toolchain(name="h", host="{HOST}", target="{HOST}", cc="bash", cxx="bash", '
+            + 'ar="bash")\n'
+            + f'cc_toolchain(name="n", host="{HOST}", target="native", cc="bash", cxx="bash", '
+            + 'ar="cat")\n'
+        )
+    })
+    rule_runner.set_options([f"--platforms-host={HOST}"])
+    native = rule_runner.request(
+        CargoPlatform, [CargoPlatformRequest(TargetPlatform("native", HOST_OS, HOST_ARCH))]
+    )
+    env = dict(native.env)
+    assert env.pop("__PANTS_CC_TOOLCHAIN") == native.cc.env["__PANTS_CC_TOOLCHAIN"]
+    assert set(env) == _names(MACHINE_TRIPLE)
+    assert os.path.basename(env[f"AR_{MACHINE_TRIPLE.replace('-', '_')}"]) == "cat"
 
 
 def test_dlltool_next_to_the_windows_gnu_compiler(rule_runner: RuleRunner, tmp_path: Path) -> None:

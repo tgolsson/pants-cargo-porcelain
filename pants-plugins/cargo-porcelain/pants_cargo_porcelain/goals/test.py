@@ -32,14 +32,13 @@ from pants_cargo_porcelain.target_generator import PACKAGE_GENERATED_NAME, artif
 from pants_cargo_porcelain.target_types import (
     CargoArtifactKindField,
     CargoArtifactNameField,
-    CargoEnvField,
     CargoPackageNameField,
     SkipCargoTestsField,
 )
 from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
 from pants_cargo_porcelain.util_rules.platform import CargoPlatformRequest, cargo_platform
 from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
-from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources, parse_env
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
 logger = logging.getLogger(__name__)
@@ -68,7 +67,6 @@ class CargoTestFieldSet(TestFieldSet):
 
     kind: CargoArtifactKindField
     artifact_name: CargoArtifactNameField
-    env: CargoEnvField
     environment: EnvironmentField
 
     @classmethod
@@ -222,7 +220,6 @@ async def run_cargo_test(
             working_directory=spec_path,
             env={
                 **build.env,
-                **parse_env(field_set.env.value),
                 "CARGO_MANIFEST_DIR": os.path.join("{chroot}", spec_path).rstrip("/"),
             },
             description=f"Run {field_set.address}",

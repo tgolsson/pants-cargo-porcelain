@@ -15,7 +15,7 @@ from pants.engine.fs import DigestSubset, PathGlobs
 from pants.engine.internals.graph import hydrate_sources, resolve_targets
 from pants.engine.internals.specs_rules import resolve_addresses_from_raw_specs
 from pants.engine.intrinsics import digest_subset_to_digest, get_digest_contents
-from pants.engine.rules import collect_rules, implicitly, rule
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import (
     FieldSet,
     HydrateSourcesRequest,
@@ -71,23 +71,28 @@ async def infer_cargo_dependencies(
     if workspace is not None:
         dependencies.append(workspace)
 
-    for file_content in contents:
-        manifest = tomllib.loads(file_content.content.decode())
-        for table in _dependency_tables(manifest):
-            for dependency in table.values():
-                if not isinstance(dependency, dict) or "path" not in dependency:
-                    continue
-                directory = os.path.normpath(os.path.join(address.spec_path, dependency["path"]))
-                addresses = await resolve_addresses_from_raw_specs(
-                    RawSpecs(
-                        dir_globs=(DirGlobSpec(directory),),
-                        description_of_origin=f"the path dependencies of {address}",
-                    )
-                )
-                candidates = await resolve_targets(**implicitly({addresses: Addresses}))
-                dependencies.extend(
-                    t.address for t in candidates if t.has_field(_CargoPackageMarker)
-                )
+    directories = sorted({
+        os.path.normpath(os.path.join(address.spec_path, dependency["path"]))
+        for file_content in contents
+        for table in _dependency_tables(tomllib.loads(file_content.content.decode()))
+        for dependency in table.values()
+        if isinstance(dependency, dict) and "path" in dependency
+    })
+    address_sets = await concurrently(
+        resolve_addresses_from_raw_specs(
+            RawSpecs(
+                dir_globs=(DirGlobSpec(directory),),
+                description_of_origin=f"the path dependencies of {address}",
+            )
+        )
+        for directory in directories
+    )
+    candidates = await concurrently(
+        resolve_targets(**implicitly({addresses: Addresses})) for addresses in address_sets
+    )
+    dependencies.extend(
+        t.address for targets in candidates for t in targets if t.has_field(_CargoPackageMarker)
+    )
 
     return InferredDependencies(sorted(d for d in dependencies if d != address))
 

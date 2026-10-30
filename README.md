@@ -93,9 +93,10 @@ cargo_package(platforms=["linux-x86_64", "windows-x86_64"])
   then one process per test executable, so each `cargo_library`, `cargo_binary` and
   `cargo_test` is its own cached test result. Doctests are not run. The executables run from
   the package directory with the sources at hand and `CARGO_MANIFEST_DIR` set to it, as
-  `cargo test` does, but a path compiled in through `env!("CARGO_MANIFEST_DIR")` names the
-  build sandbox, not the run sandbox. A target cargo builds no executable for (its
-  `required-features` are off) is skipped with a warning.
+  `cargo test` does, but a path compiled in through `env!("CARGO_MANIFEST_DIR")` or
+  `env!("CARGO_BIN_EXE_<name>")` names the build sandbox, which is gone when the test runs:
+  read `CARGO_MANIFEST_DIR` with `std::env::var` instead. A target cargo builds no executable
+  for (its `required-features` are off) is skipped with a warning.
 - `fmt` / `lint`: `cargo fmt` (`[rust].skip`) and, with
   `pants_cargo_porcelain.backends.clippy`, `cargo clippy` (`[clippy].args`, `[clippy].skip`),
   once per workspace.
