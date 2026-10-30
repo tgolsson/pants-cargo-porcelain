@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         pants-version: ["2.33.1"]
-        platform: ["macos-14", "ubuntu-latest"]
+        platform: ["macos-15", "ubuntu-latest"]
         shard: [0, 1, 2]
 
     runs-on: "${{ matrix.platform }}"
