@@ -23,6 +23,7 @@ from pants_cargo_porcelain.target_types import (
     CargoWorkspaceTarget,
     _CargoPackageMarker,
 )
+from pants_cargo_porcelain.util_rules.cargo import manifest_path
 
 
 @dataclass(frozen=True)
@@ -56,8 +57,12 @@ class CargoTomlRequest:
 @rule(desc="Load a Cargo.toml")
 async def load_cargo_toml(request: CargoTomlRequest) -> CargoToml:
     hydrated = await hydrate_sources(HydrateSourcesRequest(request.sources), **implicitly())
+    # Exactly the target's own: `sources` may hold member manifests too.
     manifest = await digest_subset_to_digest(
-        DigestSubset(hydrated.snapshot.digest, PathGlobs(["**/Cargo.toml"]))
+        DigestSubset(
+            hydrated.snapshot.digest,
+            PathGlobs([manifest_path(request.sources.address.spec_path)]),
+        )
     )
     contents = await get_digest_contents(manifest)
     if not contents:

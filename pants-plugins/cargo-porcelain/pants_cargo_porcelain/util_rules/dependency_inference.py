@@ -29,6 +29,7 @@ from pants_cargo_porcelain.target_types import (
     CargoPackageSourcesField,
     _CargoPackageMarker,
 )
+from pants_cargo_porcelain.util_rules.cargo import manifest_path
 from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
 
@@ -56,13 +57,12 @@ async def infer_cargo_dependencies(
     request: InferCargoDependencies, mapping: CargoPackageMapping
 ) -> InferredDependencies:
     address = request.field_set.address
-    manifest_path = os.path.join(address.spec_path, "Cargo.toml")
     hydrated = await hydrate_sources(
         HydrateSourcesRequest(request.field_set.sources), **implicitly()
     )
     contents = await get_digest_contents(
         await digest_subset_to_digest(
-            DigestSubset(hydrated.snapshot.digest, PathGlobs([manifest_path]))
+            DigestSubset(hydrated.snapshot.digest, PathGlobs([manifest_path(address.spec_path)]))
         )
     )
 
@@ -82,7 +82,7 @@ async def infer_cargo_dependencies(
         resolve_addresses_from_raw_specs(
             RawSpecs(
                 dir_globs=(DirGlobSpec(directory),),
-                description_of_origin=f"the path dependencies of {address}",
+                description_of_origin=f"the `path` dependency `{directory}` of {address}",
             )
         )
         for directory in directories

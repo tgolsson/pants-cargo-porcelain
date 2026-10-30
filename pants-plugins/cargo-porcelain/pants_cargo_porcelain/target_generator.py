@@ -86,14 +86,17 @@ async def generate_cargo_targets(
     metadata = json.loads(result.stdout)
     # At a workspace root that is also a package, the members are listed too: the root's
     # manifest is the shortest path ending in it.
-    package = min(
-        (
-            p
-            for p in metadata["packages"]
-            if p["manifest_path"].endswith(f"/{manifest_path(generator.address.spec_path)}")
-        ),
-        key=lambda p: len(p["manifest_path"]),
-    )
+    own = [
+        p
+        for p in metadata["packages"]
+        if p["manifest_path"].endswith(f"/{manifest_path(generator.address.spec_path)}")
+    ]
+    if not own:
+        raise ValueError(
+            f"{generator.address}: its Cargo.toml has no `[package]`; a workspace-only manifest "
+            "is a `cargo_workspace`"
+        )
+    package = min(own, key=lambda p: len(p["manifest_path"]))
 
     package_address = generator.address.create_generated(PACKAGE_GENERATED_NAME)
     generated = [

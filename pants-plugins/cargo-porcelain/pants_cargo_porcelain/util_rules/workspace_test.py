@@ -59,6 +59,22 @@ def test_workspace_members(rule_runner: RuleRunner) -> None:
     assert mapping.workspace_for(loose.address) is None
 
 
+def test_member_manifests_among_the_sources(rule_runner: RuleRunner) -> None:
+    # `0-core/Cargo.toml` sorts before the workspace's own manifest.
+    rule_runner.write_files({
+        "ws/Cargo.toml": '[workspace]\nresolver = "2"\nmembers = ["0-core"]\n',
+        "ws/Cargo.lock": "version = 4\n",
+        "ws/BUILD": (
+            'cargo_workspace(name="workspace", '
+            'sources=["Cargo.toml", "Cargo.lock", "0-core/Cargo.toml"])'
+        ),
+        **{k.replace("core/", "ws/0-core/", 1): v for k, v in package_fixture("core").items()},
+    })
+    mapping = rule_runner.request(CargoPackageMapping, [])
+    core = rule_runner.get_target(Address("ws/0-core", generated_name="package"))
+    assert mapping.workspace_for(core.address) == Address("ws", target_name="workspace")
+
+
 def test_root_package(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
         "ws/BUILD": 'cargo_workspace(name="workspace")\ncargo_package()',

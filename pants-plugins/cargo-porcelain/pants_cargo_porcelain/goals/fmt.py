@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import glob
 from dataclasses import dataclass
 
 from pants.core.environments.target_types import EnvironmentField
@@ -9,8 +10,8 @@ from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
 from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.fs import DigestSubset, MergeDigests, PathGlobs
-from pants.engine.intrinsics import digest_subset_to_digest, merge_digests
+from pants.engine.fs import CreateDigest, FileEntry, MergeDigests
+from pants.engine.intrinsics import create_digest, get_digest_entries, merge_digests
 from pants.engine.process import fallible_to_exec_result_or_raise
 from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
@@ -94,8 +95,12 @@ async def cargo_fmt(
     )
     # The batch's files come from the fmt chain (an earlier formatter may have changed them);
     # everything else cargo needs comes from the sources.
-    others = await digest_subset_to_digest(
-        DigestSubset(sources.digest, PathGlobs(["**", *(f"!{f}" for f in request.files)]))
+    # A file name may hold glob characters (`src/[gen].rs`): the batch's files leave the
+    # sources by exact path, and their outputs are captured escaped.
+    batch = set(request.files)
+    entries = await get_digest_entries(sources.digest)
+    others = await create_digest(
+        CreateDigest(e for e in entries if not (isinstance(e, FileEntry) and e.path in batch))
     )
     input_digest = await merge_digests(MergeDigests([others, request.snapshot.digest]))
     result = await fallible_to_exec_result_or_raise(
@@ -109,7 +114,7 @@ async def cargo_fmt(
                 ),
                 description=f"cargo fmt {root.root}",
                 digest=input_digest,
-                output_files=request.files,
+                output_files=tuple(glob.escape(f) for f in request.files),
                 env=sources.env,
             )
         )

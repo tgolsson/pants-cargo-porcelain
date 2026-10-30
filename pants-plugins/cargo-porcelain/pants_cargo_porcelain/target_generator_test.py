@@ -56,6 +56,15 @@ def test_generated_name_collisions(rule_runner: RuleRunner, extra: str, message:
         rule_runner.get_target(Address("pkg", generated_name="library"))
 
 
+def test_a_workspace_only_manifest_is_not_a_package(rule_runner: RuleRunner) -> None:
+    rule_runner.write_files({
+        "ws/BUILD": "cargo_package()",
+        "ws/Cargo.toml": "[workspace]\nmembers = []\n",
+    })
+    with pytest.raises(ExecutionError, match=r"ws: its Cargo.toml has no `\[package\]`"):
+        rule_runner.get_target(Address("ws", generated_name="package"))
+
+
 def test_workspace_root_package_is_its_own(rule_runner: RuleRunner) -> None:
     # The member is in the root's sources so `cargo metadata` can load it, and comes first
     # in `members`.
