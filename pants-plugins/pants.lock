@@ -9,8 +9,8 @@
 //     "CPython==3.14.*"
 //   ],
 //   "generated_with_requirements": [
-//     "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7a#subdirectory=pants-plugins/cc",
-//     "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7ac8781d68547daedd26492bf6fdaf#subdirectory=pants-plugins/platforms",
+//     "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e#subdirectory=pants-plugins/cc",
+//     "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e401980ef539b46d93575cedff568#subdirectory=pants-plugins/platforms",
 //     "pantsbuild.pants.testutil==2.33.1",
 //     "pantsbuild.pants==2.33.1",
 //     "pytest-cov>=5",
@@ -870,9 +870,9 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "commit_id": "12372aaa9c7a",
-              "hash": "3c290464601084bd40a5d92c1cc90138614effad4c0c77eab48864e82b4f29f3",
-              "url": "git+https://github.com/tgolsson/pants-backends@12372aaa9c7a#subdirectory=pants-plugins/cc"
+              "commit_id": "5060ff485a3e",
+              "hash": "1e404349354295752fbdb7d6456e8cc1ba38cd97d69aafe8bd0d60205659a695",
+              "url": "git+https://github.com/tgolsson/pants-backends@5060ff485a3e#subdirectory=pants-plugins/cc"
             }
           ],
           "project_name": "pants-backend-cc",
@@ -887,9 +887,9 @@
           "artifacts": [
             {
               "algorithm": "sha256",
-              "commit_id": "12372aaa9c7ac8781d68547daedd26492bf6fdaf",
-              "hash": "57290aa450c48d8dd9e9ef3ef7d5145cfd5fe28379496ee3944aa497cca01ef7",
-              "url": "git+https://github.com/tgolsson/pants-backends@12372aaa9c7ac8781d68547daedd26492bf6fdaf#subdirectory=pants-plugins/platforms"
+              "commit_id": "5060ff485a3e401980ef539b46d93575cedff568",
+              "hash": "3d3f68e021c5f2bdf4bf143314b65d4768ae3584dd7ff76e2ac489aeca07150f",
+              "url": "git+https://github.com/tgolsson/pants-backends@5060ff485a3e401980ef539b46d93575cedff568#subdirectory=pants-plugins/platforms"
             }
           ],
           "project_name": "pants-backend-platforms",
@@ -1704,8 +1704,8 @@
   "pip_version": "24.2",
   "prefer_older_binary": false,
   "requirements": [
-    "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7a#subdirectory=pants-plugins/cc",
-    "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7ac8781d68547daedd26492bf6fdaf#subdirectory=pants-plugins/platforms",
+    "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e#subdirectory=pants-plugins/cc",
+    "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e401980ef539b46d93575cedff568#subdirectory=pants-plugins/platforms",
     "pantsbuild.pants.testutil==2.33.1",
     "pantsbuild.pants==2.33.1",
     "pytest-cov>=5",

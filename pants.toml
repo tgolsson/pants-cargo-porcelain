@@ -5,8 +5,8 @@ pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
 # The porcelain's own dependencies, for the backend loaded from source above, spelled as in
 # pants-plugins/cargo-porcelain/pyproject.toml.
 plugins = [
-  "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7a#subdirectory=pants-plugins/cc",
-  "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@12372aaa9c7ac8781d68547daedd26492bf6fdaf#subdirectory=pants-plugins/platforms",
+  "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e#subdirectory=pants-plugins/cc",
+  "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e401980ef539b46d93575cedff568#subdirectory=pants-plugins/platforms",
 ]
 
 backend_packages = [
