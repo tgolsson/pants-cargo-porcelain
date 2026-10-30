@@ -1,166 +1,159 @@
+"""`cargo_package` generates its targets from `cargo metadata`: the package itself, its
+library, and one target per binary and integration test. A target with `test = false` gets
+`skip_tests`."""
+
 from __future__ import annotations
 
 import json
 
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
-from pants.engine.internals.selectors import Get, MultiGet
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, implicitly, rule
 from pants.engine.target import GeneratedTargets, GenerateTargetsRequest
-from pants.engine.unions import UnionRule
+from pants.engine.unions import UnionMembership, UnionRule
 
-from pants_cargo_porcelain.internal.platform import platform_to_target
-from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
 from pants_cargo_porcelain.target_types import (
-    CargoBinaryNameField,
+    CargoArtifactKindField,
+    CargoArtifactNameField,
     CargoBinaryTarget,
-    CargoLibraryNameField,
     CargoLibraryTarget,
     CargoPackageDependenciesField,
     CargoPackageNameField,
     CargoPackageSourcesField,
     CargoPackageTarget,
     CargoPackageTargetImpl,
-    CargoSourcesTarget,
-    CargoTestNameField,
     CargoTestTarget,
-    _CargoSourcesMarker,
+    SkipCargoTestsField,
+    _CargoPackageMarker,
 )
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
+from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
+from pants_cargo_porcelain.util_rules.rustup import (
+    RustVersion,
+    install_rust_toolchain,
+    machine_toolchain_request,
+)
+
+PACKAGE_GENERATED_NAME = "package"
+LIBRARY_GENERATED_NAME = "library"
+
+_LIBRARY_KINDS = frozenset({"lib", "rlib", "dylib", "cdylib", "staticlib", "proc-macro"})
+
+
+def artifact_kind(cargo_kinds: list[str]) -> str | None:
+    """cargo's `target.kind` list as this backend's `kind`, or None for what it does not
+    model (examples, benches, custom builds)."""
+    if "bin" in cargo_kinds:
+        return "bin"
+    if "test" in cargo_kinds:
+        return "test"
+    if _LIBRARY_KINDS.intersection(cargo_kinds):
+        return "lib"
+    return None
 
 
 class GenerateCargoTargetsRequest(GenerateTargetsRequest):
     generate_from = CargoPackageTarget
 
 
-@rule
-async def generate_cargo_generated_target(
+@rule(desc="Generate the targets of a cargo package")
+async def generate_cargo_targets(
     request: GenerateCargoTargetsRequest,
-    rust: RustSubsystem,
-    rustup: RustupTool,
+    version: RustVersion,
     platform: Platform,
+    union_membership: UnionMembership,
 ) -> GeneratedTargets:
-    source_files, toolchain = await MultiGet(
-        Get(
-            SourceFiles,
-            SourceFilesRequest(
-                [request.generator.get(CargoPackageSourcesField)],
-            ),
-        ),
-        Get(
-            RustToolchain,
-            RustToolchainRequest(
-                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
-            ),
-        ),
+    generator = request.generator
+    source_files = await determine_source_files(
+        SourceFilesRequest([generator.get(CargoPackageSourcesField)])
     )
-
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            (
-                "metadata",
-                f"--manifest-path={request.generator.address.spec_path}/Cargo.toml",
-                "--format-version=1",
-                "--no-deps",
-            ),
-            source_files.snapshot.digest,
-        ),
+    toolchain = await install_rust_toolchain(machine_toolchain_request(version, platform))
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CargoProcessRequest(
+                toolchain,
+                (
+                    "metadata",
+                    f"--manifest-path={manifest_path(generator.address.spec_path)}",
+                    "--format-version=1",
+                    "--no-deps",
+                ),
+                description=f"cargo metadata for {generator.address}",
+                digest=source_files.snapshot.digest,
+            )
+        )
     )
+    metadata = json.loads(result.stdout)
+    # At a workspace root that is also a package, the members are listed too: the root's
+    # manifest is the shortest path ending in it.
+    own = [
+        p
+        for p in metadata["packages"]
+        if p["manifest_path"].endswith(f"/{manifest_path(generator.address.spec_path)}")
+    ]
+    if not own:
+        raise ValueError(
+            f"{generator.address}: its Cargo.toml has no `[package]`; a workspace-only manifest "
+            "is a `cargo_workspace`"
+        )
+    package = min(own, key=lambda p: len(p["manifest_path"]))
 
-    output = json.loads(process_result.stdout)
-    targets_meta = output["packages"][0]["targets"]
-
-    libraries = []
-    binaries = []
-    tests = []
-
-    for target in targets_meta:
-        if "bin" in target["kind"]:
-            binaries.append(target)
-
-        if "lib" in target["kind"]:
-            libraries.append(target)
-
-        if "test" in target["kind"]:
-            tests.append(target)
-
-    sources = request.generator.address.create_generated("sources")
-    sources_address = str(sources)
-
-    package = request.generator.address.create_generated("package")
-    package_address = str(package)
-
-    generated_targets = [
-        CargoSourcesTarget(
-            {
-                **request.template,
-                _CargoSourcesMarker.alias: "yes",
-            },
-            sources,
-        ),
+    package_address = generator.address.create_generated(PACKAGE_GENERATED_NAME)
+    generated = [
         CargoPackageTargetImpl(
             {
                 **request.template,
-                CargoPackageNameField.alias: output["packages"][0]["name"],
-                CargoPackageDependenciesField.alias: [sources_address],
+                CargoPackageSourcesField.alias: generator[CargoPackageSourcesField].value,
+                CargoPackageNameField.alias: package["name"],
+                # `dependencies` is a moved field: not on the generator, in the template.
+                _CargoPackageMarker.alias: "yes",
             },
-            package,
-        ),
+            package_address,
+            union_membership=union_membership,
+        )
     ]
 
-    generated_lib_names = []
-    for target in libraries:
-        name = request.generator.address.create_generated("library")
-        generated_targets.append(
-            CargoLibraryTarget(
-                {
-                    CargoLibraryNameField.alias: target["name"],
-                    CargoPackageDependenciesField.alias: [package_address],
-                    **request.template,
-                },
-                name,
+    taken: dict[str, str] = {}
+    for target in package["targets"]:
+        kind = artifact_kind(target["kind"])
+        if kind is None:
+            continue
+        target_type = {
+            "lib": CargoLibraryTarget,
+            "bin": CargoBinaryTarget,
+            "test": CargoTestTarget,
+        }[kind]
+        generated_name = LIBRARY_GENERATED_NAME if kind == "lib" else target["name"]
+        if kind != "lib" and generated_name in (PACKAGE_GENERATED_NAME, LIBRARY_GENERATED_NAME):
+            raise ValueError(
+                f"{generator.address}: the {kind} target `{generated_name}` would be generated "
+                f"as `#{generated_name}`, which is reserved for the package's own "
+                f"`{generated_name}` target; rename it in Cargo.toml"
             )
-        )
-        generated_lib_names.append(str(name))
-
-    for target in binaries:
-        name = request.generator.address.create_generated(target["name"])
-        generated_targets.append(
-            CargoBinaryTarget(
-                {
-                    CargoPackageDependenciesField.alias: [package_address],
-                    CargoBinaryNameField.alias: target["name"],
-                    **request.template,
-                },
-                name,
+        if generated_name in taken:
+            raise ValueError(
+                f"{generator.address}: the {taken[generated_name]} target and the {kind} target "
+                f"`{generated_name}` would both be generated as `#{generated_name}`; rename one "
+                "in Cargo.toml"
             )
-        )
-
-    for target in tests:
-        name = request.generator.address.create_generated(target["name"])
-        generated_targets.append(
-            CargoTestTarget(
+        taken[generated_name] = kind
+        generated.append(
+            target_type(
                 {
                     **request.template,
-                    CargoPackageDependenciesField.alias: [package_address],
-                    CargoTestNameField.alias: target["name"],
-                    CargoPackageSourcesField.alias: [
-                        *CargoPackageSourcesField.default,
-                        "tests/**/*.rs",
-                    ],
+                    CargoPackageDependenciesField.alias: [str(package_address)],
+                    CargoPackageNameField.alias: package["name"],
+                    CargoArtifactKindField.alias: kind,
+                    CargoArtifactNameField.alias: target["name"],
+                    # `cargo test` builds no test executable for it.
+                    **({} if target.get("test", True) else {SkipCargoTestsField.alias: True}),
                 },
-                name,
+                generator.address.create_generated(generated_name),
+                union_membership=union_membership,
             )
         )
 
-    return GeneratedTargets(
-        request.generator,
-        generated_targets,
-    )
+    return GeneratedTargets(generator, generated)
 
 
 def rules():

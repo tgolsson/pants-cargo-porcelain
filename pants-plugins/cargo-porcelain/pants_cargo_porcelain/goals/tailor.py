@@ -1,3 +1,6 @@
+"""`pants tailor`: a `cargo_package` for every unowned `Cargo.toml` with a `[package]`, a
+`cargo_workspace` for every one with a `[workspace]`."""
+
 from __future__ import annotations
 
 import os
@@ -9,14 +12,13 @@ from pants.core.goals.tailor import (
     PutativeTargets,
     PutativeTargetsRequest,
 )
-from pants.engine.fs import DigestContents, PathGlobs
-from pants.engine.internals.selectors import Get
+from pants.engine.intrinsics import get_digest_contents, path_globs_to_digest
 from pants.engine.rules import collect_rules, rule
 from pants.engine.unions import UnionRule
 from pants.util.dirutil import group_by_dir
 from pants.util.logging import LogLevel
 
-from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
+from pants_cargo_porcelain.subsystems import RustSubsystem
 from pants_cargo_porcelain.target_types import CargoPackageTarget, CargoWorkspaceTarget
 
 
@@ -25,29 +27,23 @@ class PutativeCargoTargetsRequest(PutativeTargetsRequest):
     pass
 
 
-@rule(level=LogLevel.DEBUG, desc="Determine candidate Cargo targets to create")
+@rule(level=LogLevel.DEBUG, desc="Determine candidate cargo targets to create")
 async def find_putative_targets(
-    req: PutativeCargoTargetsRequest,
-    all_owned_sources: AllOwnedSources,
-    rust: RustSubsystem,
-    rustup: RustupTool,
+    request: PutativeCargoTargetsRequest, all_owned_sources: AllOwnedSources, rust: RustSubsystem
 ) -> PutativeTargets:
     if not rust.tailor:
         return PutativeTargets()
 
-    all_cargo_contents = await Get(DigestContents, PathGlobs, req.path_globs("Cargo.toml"))
+    contents = await get_digest_contents(
+        await path_globs_to_digest(request.path_globs("Cargo.toml"))
+    )
+    unowned = {fc.path: fc.content for fc in contents if fc.path not in all_owned_sources}
 
-    unowned_cargo_files = set(fc.path for fc in all_cargo_contents) - set(all_owned_sources)
-    unowned_cargo_contents = {
-        fc.path: fc.content for fc in all_cargo_contents if fc.path in unowned_cargo_files
-    }
-
-    pts = []
-
-    for dirname, filenames in group_by_dir(unowned_cargo_files).items():
-        contents = unowned_cargo_contents[os.path.join(dirname, "Cargo.toml")]
-        if b"[package]" in contents:
-            pts.append(
+    putative = []
+    for dirname, filenames in group_by_dir(unowned).items():
+        manifest = unowned[os.path.join(dirname, "Cargo.toml")]
+        if b"[package]" in manifest:
+            putative.append(
                 PutativeTarget.for_target_type(
                     CargoPackageTarget,
                     path=dirname,
@@ -55,9 +51,8 @@ async def find_putative_targets(
                     triggering_sources=sorted(filenames),
                 )
             )
-
-        if b"[workspace]" in contents:
-            pts.append(
+        if b"[workspace]" in manifest:
+            putative.append(
                 PutativeTarget.for_target_type(
                     CargoWorkspaceTarget,
                     path=dirname,
@@ -65,12 +60,8 @@ async def find_putative_targets(
                     triggering_sources=sorted(filenames),
                 )
             )
-
-    return PutativeTargets(pts)
+    return PutativeTargets(putative)
 
 
 def rules():
-    return [
-        *collect_rules(),
-        UnionRule(PutativeTargetsRequest, PutativeCargoTargetsRequest),
-    ]
+    return [*collect_rules(), UnionRule(PutativeTargetsRequest, PutativeCargoTargetsRequest)]

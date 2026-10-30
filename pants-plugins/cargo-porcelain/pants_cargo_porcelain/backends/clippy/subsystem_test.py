@@ -1,148 +1,74 @@
+from __future__ import annotations
+
 import pytest
 from pants.build_graph.address import Address
 from pants.core.goals.lint import LintResult, Partitions
-from pants.core.util_rules import external_tool, source_files
 from pants.engine.rules import QueryRule
 from pants.testutil.rule_runner import RuleRunner
 
-from pants_cargo_porcelain import register
-from pants_cargo_porcelain.backends.clippy import register as clippy_register
-from pants_cargo_porcelain.backends.clippy.goals.lint import (
-    CargoClippyFieldSet,
-    CargoClippyRequest,
-    PackageMetadata,
-)
+from pants_cargo_porcelain.backends.clippy.goals.lint import CargoClippyFieldSet, CargoClippyRequest
+from pants_cargo_porcelain.goals.fmt import RootMetadata
+from pants_cargo_porcelain.testing import make_rule_runner, package_fixture
 
 
 @pytest.fixture
-def rule_runner():
-    rule_runner = RuleRunner(
-        rules=[
-            *register.rules(),
-            *clippy_register.rules(),
-            *source_files.rules(),
-            *external_tool.rules(),
-            QueryRule(Partitions, [CargoClippyRequest.PartitionRequest]),
-            QueryRule(LintResult, [CargoClippyRequest.Batch]),
-        ],
-        target_types=register.target_types(),
-    )
-
-    return rule_runner
+def rule_runner() -> RuleRunner:
+    return make_rule_runner([
+        QueryRule(Partitions, [CargoClippyRequest.PartitionRequest]),
+        QueryRule(LintResult, [CargoClippyRequest.Batch]),
+    ])
 
 
-def test_clippy_subsystem_partition(rule_runner) -> None:
-    rule_runner.write_files({
-        "rust/BUILD": "cargo_package()",
-        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-        "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
-    })
-
-    tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
-    res = rule_runner.request(
-        Partitions[CargoClippyFieldSet, PackageMetadata],
-        [CargoClippyRequest.PartitionRequest((CargoClippyFieldSet.create(tgt),))],
-    )
-
-    assert len(res) == 1
-
-
-def test_clippy_subsystem_run_ok(rule_runner) -> None:
-    rule_runner.set_options(["--clippy-args=['--', '-Dwarnings']"], env_inherit={"PATH"})
-
-    rule_runner.write_files({
-        "rust/BUILD": "cargo_package()",
-        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-        "rust/Cargo.lock": """version = 3
-[[package]]
-name = "rust"
-version = "0.1.0"
-""",
-        "rust/src/main.rs": 'fn main() { println!("Hello, world!"); }',
-    })
-
-    tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
+def _lint(rule_runner: RuleRunner, main: str, *options: str) -> LintResult:
+    rule_runner.set_options(["--rustup-rust-version=1.97.0", *options], env_inherit={"PATH"})
+    rule_runner.write_files(package_fixture("rust", main=main))
+    tgt = rule_runner.get_target(Address("rust", generated_name="package"))
     partitions = rule_runner.request(
-        Partitions[CargoClippyFieldSet, PackageMetadata],
+        Partitions[CargoClippyFieldSet, RootMetadata],
         [CargoClippyRequest.PartitionRequest((CargoClippyFieldSet.create(tgt),))],
     )
-
-    results = []
-    for partition in partitions:
-        result = rule_runner.request(
-            LintResult,
-            [CargoClippyRequest.Batch("", partition.elements, partition.metadata)],
-        )
-
-        results.append(result)
-
-    assert len(results) == 1
-    assert results[0].exit_code == 0
+    assert len(partitions) == 1
+    partition = partitions[0]
+    assert partition.metadata == RootMetadata(tgt.address, workspace=False)
+    return rule_runner.request(
+        LintResult, [CargoClippyRequest.Batch("", partition.elements, partition.metadata)]
+    )
 
 
-def test_clippy_subsystem_run_warn(rule_runner) -> None:
-    rule_runner.set_options([], env_inherit={"PATH"})
+def test_clippy_ok(rule_runner: RuleRunner) -> None:
+    result = _lint(
+        rule_runner, 'fn main() { println!("Hello, world!"); }', "--clippy-args=-- -Dwarnings"
+    )
+    assert result.exit_code == 0, result.stderr
 
+
+def test_clippy_warns(rule_runner: RuleRunner) -> None:
+    result = _lint(rule_runner, "fn main() { let a = 10; }")
+    assert result.exit_code == 0
+    assert "unused variable: `a`" in result.stderr
+
+
+def test_clippy_errors(rule_runner: RuleRunner) -> None:
+    result = _lint(rule_runner, "fn main() { let a = 10; }", "--clippy-args=-- -Dwarnings")
+    assert result.exit_code == 101
+    assert "unused variable: `a`" in result.stderr
+
+
+def test_one_partition_per_workspace(rule_runner: RuleRunner) -> None:
     rule_runner.write_files({
-        "rust/BUILD": "cargo_package()",
-        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-        "rust/Cargo.lock": """version = 3
-[[package]]
-name = "rust"
-version = "0.1.0"
-""",
-        "rust/src/main.rs": "fn main() { let a = 10; }",
+        "ws/Cargo.toml": '[workspace]\nresolver = "2"\nmembers = ["a", "b"]\n',
+        "ws/Cargo.lock": "version = 4\n",
+        "ws/BUILD": 'cargo_workspace(name="workspace")',
+        **{k.replace("a/", "ws/a/", 1): v for k, v in package_fixture("a").items()},
+        **{k.replace("b/", "ws/b/", 1): v for k, v in package_fixture("b").items()},
+        **package_fixture("loose"),
     })
-
-    tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
-    partitions = rule_runner.request(
-        Partitions[CargoClippyFieldSet, PackageMetadata],
-        [CargoClippyRequest.PartitionRequest((CargoClippyFieldSet.create(tgt),))],
+    field_sets = tuple(
+        CargoClippyFieldSet.create(rule_runner.get_target(Address(path, generated_name="package")))
+        for path in ("ws/a", "ws/b", "loose")
     )
-
-    results = []
-    for partition in partitions:
-        result = rule_runner.request(
-            LintResult,
-            [CargoClippyRequest.Batch("", partition.elements, partition.metadata)],
-        )
-
-        results.append(result)
-
-    assert len(results) == 1
-    assert results[0].exit_code == 0
-    assert "unused variable: `a`" in results[0].stderr
-
-
-def test_clippy_subsystem_run_error(rule_runner) -> None:
-    rule_runner.set_options(["--clippy-args=['--', '-Dwarnings']"], env_inherit={"PATH"})
-
-    rule_runner.write_files({
-        "rust/BUILD": "cargo_package()",
-        "rust/Cargo.toml": '[package]\nname = "rust"\nversion = "0.1.0"\n',
-        "rust/Cargo.lock": """version = 3
-[[package]]
-name = "rust"
-version = "0.1.0"
-""",
-        "rust/src/main.rs": "fn main() { let a = 10; }",
-    })
-
-    tgt = rule_runner.get_target(Address("rust", target_name="rust", generated_name="package"))
     partitions = rule_runner.request(
-        Partitions[CargoClippyFieldSet, PackageMetadata],
-        [CargoClippyRequest.PartitionRequest((CargoClippyFieldSet.create(tgt),))],
+        Partitions[CargoClippyFieldSet, RootMetadata],
+        [CargoClippyRequest.PartitionRequest(field_sets)],
     )
-
-    results = []
-    for partition in partitions:
-        result = rule_runner.request(
-            LintResult,
-            [CargoClippyRequest.Batch("", partition.elements, partition.metadata)],
-        )
-
-        results.append(result)
-
-    assert len(results) == 1
-    assert results[0].exit_code == 101
-    assert "unused variable: `a`" in results[0].stderr
+    assert sorted(str(p.metadata.root) for p in partitions) == ["loose#package", "ws:workspace"]

@@ -1,102 +1,102 @@
+"""`cargo build` of one binary for a platform."""
+
+from __future__ import annotations
+
 from dataclasses import dataclass
 
-from pants.core.util_rules.source_files import SourceFiles
 from pants.engine.addresses import Address
-from pants.engine.fs import Digest
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import Digest, RemovePrefix
+from pants.engine.intrinsics import remove_prefix
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.util.frozendict import FrozenDict
+from pants_backend_platforms.util_rules.platforms import TargetPlatform
 
-from pants_cargo_porcelain.internal.platform import platform_to_target
-from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
-from pants_cargo_porcelain.target_types import CargoPackageSourcesField
-from pants_cargo_porcelain.tool import InstalledRustTool, RustToolRequest, Sccache
-from pants_cargo_porcelain.tools.mtime import CargoMtime
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
-from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
-
-
-@dataclass(frozen=True)
-class CargoBinary:
-    digest: Digest
+from pants_cargo_porcelain.util_rules.cargo import TARGET_DIR, CargoProcessRequest, manifest_path
+from pants_cargo_porcelain.util_rules.platform import (
+    CargoPlatformRequest,
+    RustTarget,
+    cargo_platform,
+)
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
 
 
 @dataclass(frozen=True)
 class CargoBinaryRequest:
     address: Address
-    sources: CargoPackageSourcesField
     binary_name: str
+    release: bool
+    platform: TargetPlatform
 
-    release_mode: bool = False
+
+@dataclass(frozen=True)
+class CargoBinary:
+    """The built binary, alone at the root of the digest."""
+
+    digest: Digest
+    name: str
 
 
-@rule
-async def build_cargo_binary(
-    req: CargoBinaryRequest,
-    rust: RustSubsystem,
-    rustup: RustupTool,
-    sccache: Sccache,
-    mtime: CargoMtime,
-    platform: Platform,
-) -> CargoBinary:
-    immutable_input_digests = {}
-    env = {}
-    extra_args = []
-    append_only_caches = {}
-    source_files, toolchain = await MultiGet(
-        Get(
-            SourceFiles,
+@dataclass(frozen=True)
+class CargoBuildInvocation:
+    command: tuple[str, ...]
+    output_dir: str
+    output_name: str
+
+
+def cargo_build_invocation(
+    request: CargoBinaryRequest, target: RustTarget, host_triple: str
+) -> CargoBuildInvocation:
+    """No `--target` for the machine's own triple, so the host build's command and output
+    path are those of a plain `cargo build`."""
+    profile = "release" if request.release else "debug"
+    cross = target.triple != host_triple
+    output_dir = f"{TARGET_DIR}/{target.triple}/{profile}" if cross else f"{TARGET_DIR}/{profile}"
+    return CargoBuildInvocation(
+        command=(
+            "build",
+            "--locked",
+            f"--manifest-path={manifest_path(request.address.spec_path)}",
+            f"--bin={request.binary_name}",
+            *(("--release",) if request.release else ()),
+            *((f"--target={target.triple}",) if cross else ()),
+        ),
+        output_dir=output_dir,
+        output_name=f"{request.binary_name}{target.exe_suffix}",
+    )
+
+
+@rule(desc="Build a cargo binary")
+async def build_cargo_binary(request: CargoBinaryRequest) -> CargoBinary:
+    toolchain, cargo, sources = await concurrently(
+        install_rust_toolchain(**implicitly()),
+        cargo_platform(CargoPlatformRequest(request.platform)),
+        cargo_sources(
             CargoSourcesRequest(
-                frozenset([req.address]),
-            ),
-        ),
-        Get(
-            RustToolchain,
-            RustToolchainRequest(
-                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
-            ),
+                frozenset([request.address]),
+                include_packages=True,
+                platform=request.platform,
+                dependent=request.address,
+            )
         ),
     )
-
-    if sccache.enabled:
-        sccache_tool = await Get(InstalledRustTool, RustToolRequest, sccache.as_tool_request())
-
-        immutable_input_digests[".sccache"] = sccache_tool.digest
-        env["RUSTC_WRAPPER"] = "{chroot}/.sccache/sccache"
-        env["SCCACHE_LOG"] = "debug"
-        append_only_caches["sccache"] = ".sccache-cache"
-
-    if rust.release:
-        extra_args.append("--release")
-
-    build_level = "debug"
-    if rust.release:
-        build_level = "release"
-
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            (
-                "build",
-                *extra_args,
-                f"--manifest-path={req.address.spec_path}/Cargo.toml",
-                "--locked",
-                f"--bin={req.binary_name}",
-            ),
-            source_files.snapshot.digest,
-            output_files=(f"{{cache_path}}/{build_level}/{req.binary_name}",),
-            cache_path=req.address.spec_path,
-            immutable_input_digests=FrozenDict(immutable_input_digests),
-            env=FrozenDict(env),
-            append_only_caches=FrozenDict(append_only_caches),
-        ),
+    invocation = cargo_build_invocation(request, cargo.target, cargo.machine_triple)
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CargoProcessRequest(
+                toolchain,
+                invocation.command,
+                description=f"cargo build {request.address} for {request.platform.name}",
+                digest=sources.digest,
+                output_files=(f"{invocation.output_dir}/{invocation.output_name}",),
+                env=FrozenDict({**sources.env, **cargo.env}),
+                tool_paths=cargo.tools,
+            )
+        )
     )
-
-    return CargoBinary(process_result.output_digest)
+    digest = await remove_prefix(RemovePrefix(result.output_digest, invocation.output_dir))
+    return CargoBinary(digest, invocation.output_name)
 
 
 def rules():
