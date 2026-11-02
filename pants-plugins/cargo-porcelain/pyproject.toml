@@ -1,15 +1,16 @@
 [project]
 name = "pants_cargo_porcelain"
-description = ""
-version = "0.5.0"
+description = "A Pants backend for Rust that wraps Cargo: cargo_workspace and cargo_package targets, a hermetic toolchain, kache-cached builds, and package, run, test, fmt and lint through cargo."
+version = "0.4.0"
 authors = [{ name = "Tom Solberg", email = "me@sbg.dev" }]
 requires-python = ">=3.11"
 
-license = { text = "Apache-2.0" }
+license = { file = "LICENSE-APACHE" }
 keywords = ["pantsbuild", "pants"]
 
 classifiers = [
   "Development Status :: 4 - Beta",
+  "License :: OSI Approved :: Apache Software License",
   "Programming Language :: Python",
   "Topic :: Software Development :: Build Tools",
 ]
@@ -26,6 +27,7 @@ Code = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/pants-plugin
 Changelog = "https://github.com/tgolsson/pants-cargo-porcelain/tree/main/CHANGELOG.md"
 
 [tool.pdm.build]
+includes = ["pants_cargo_porcelain"]
 excludes = ["**/BUILD"]
 
 [build-system]

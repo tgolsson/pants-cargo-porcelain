@@ -7,3 +7,17 @@ python_requirements(
     name="reqs",
     source="pyproject.toml",
 )
+
+resources(name="package_data", sources=["pyproject.toml", "LICENSE-APACHE"])
+
+# The clippy sub-backend is enabled on its own, so nothing imports it: listed by hand.
+python_distribution(
+    name="package",
+    dependencies=[
+        ":package_data",
+        "./pants_cargo_porcelain",
+        "./pants_cargo_porcelain/backends/clippy",
+        "./pants_cargo_porcelain/backends/clippy/goals",
+    ],
+    provides=python_artifact(name="pants_cargo_porcelain", version="0.4.0"),
+)

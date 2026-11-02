@@ -129,3 +129,7 @@ enabled = true  # the default; false runs rustc bare
 Linux and macOS. With no `cc_toolchain` targets, the host's `gcc`, `g++` and `ar` link.
 Declaring `platform` and `cc_toolchain` targets needs `pants_backend_platforms` and
 `pants_backend_cc` in `backend_packages` as well; the porcelain installs both.
+
+## License
+
+Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE)).
