@@ -74,6 +74,7 @@ async def generate_cargo_lockfile(
                 ("update", f"--manifest-path={manifest_path(request.root.spec_path)}"),
                 description=f"cargo update {request.root}",
                 digest=sources.digest,
+                env=sources.env,
                 output_files=(request.lockfile_dest,),
                 # The registry moves on: a cached `cargo update` would return an old lockfile.
                 cache_scope=ProcessCacheScope.PER_SESSION,

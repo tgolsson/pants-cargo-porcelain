@@ -11,7 +11,27 @@ from pants_cargo_porcelain.util_rules.workspace import (
     AllCargoTargets,
     CargoPackageMapping,
     CargoWorkspaceMember,
+    _matches,
 )
+
+
+@pytest.mark.parametrize(
+    "relative, pattern, expected",
+    [
+        ("crates/a", "crates/*", True),
+        ("crates/a/deep", "crates/*", False),
+        ("crates/foo", "crates/**/foo", True),
+        ("crates/team/nested/foo", "crates/**/foo", True),
+        ("crates/team/nested/bar", "crates/**/foo", False),
+        ("crates/a/deep", "crates/**", True),
+        ("other/a", "crates/**", False),
+        ("a", "**", True),
+        (".", ".", True),
+        ("crates/a-b", "crates/a-?", True),
+    ],
+)
+def test_member_patterns(relative: str, pattern: str, expected: bool) -> None:
+    assert _matches(relative, pattern) is expected
 
 
 @pytest.fixture

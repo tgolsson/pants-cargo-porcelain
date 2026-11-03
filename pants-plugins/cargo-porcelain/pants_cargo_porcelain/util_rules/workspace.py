@@ -88,9 +88,21 @@ class CargoPackageMapping:
 
 
 def _matches(relative: str, pattern: str) -> bool:
-    """`pattern` matches one path segment at a time, as cargo expands `members`."""
-    parts, wanted = relative.split("/"), os.path.normpath(pattern).split("/")
-    return len(parts) == len(wanted) and all(map(fnmatch.fnmatchcase, parts, wanted))
+    """`pattern` matches as cargo expands `members`: `*` within one path segment, `**` any
+    number of segments, none included."""
+    return _segments_match(relative.split("/"), os.path.normpath(pattern).split("/"))
+
+
+def _segments_match(parts: list[str], wanted: list[str]) -> bool:
+    if not wanted:
+        return not parts
+    if wanted[0] == "**":
+        return any(_segments_match(parts[i:], wanted[1:]) for i in range(len(parts) + 1))
+    return (
+        bool(parts)
+        and fnmatch.fnmatchcase(parts[0], wanted[0])
+        and _segments_match(parts[1:], wanted[1:])
+    )
 
 
 @rule(desc="Assign packages to workspaces")
