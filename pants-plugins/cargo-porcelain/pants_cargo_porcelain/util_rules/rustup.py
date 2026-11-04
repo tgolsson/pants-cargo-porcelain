@@ -131,6 +131,11 @@ class RustToolchain:
     targets: tuple[str, ...]
 
     @property
+    def name(self) -> str:
+        """The rustup toolchain name, as `RUSTUP_TOOLCHAIN` takes it."""
+        return self.path.rsplit("/", 1)[-1]
+
+    @property
     def bin_dir(self) -> str:
         return f"{self.path}/bin"
 

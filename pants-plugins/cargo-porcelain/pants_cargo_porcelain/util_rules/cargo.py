@@ -62,6 +62,7 @@ _RESERVED_ENV = frozenset({
     "CARGO_TARGET_DIR",
     "CARGO_INCREMENTAL",
     "RUSTUP_HOME",
+    "RUSTUP_TOOLCHAIN",
     "RUSTC_WRAPPER",
     "RUSTFLAGS",
     TOOLCHAIN_FINGERPRINT_ENV,
@@ -145,6 +146,9 @@ async def make_cargo_process(
             shims.path_component,
         )),
         "RUSTUP_HOME": f"{{chroot}}/{RUSTUP_NAMED_CACHE}",
+        # cargo finds subcommands (`cargo clippy`) in CARGO_HOME/bin before PATH; those are rustup
+        # proxies, which would otherwise run the named cache's default toolchain.
+        "RUSTUP_TOOLCHAIN": request.toolchain.name,
         "CARGO_HOME": f"{{chroot}}/{CARGO_NAMED_CACHE}",
         "CARGO_TARGET_DIR": f"{{chroot}}/{TARGET_DIR}",
         # Incremental compilation only pays off when the target directory is reused.
