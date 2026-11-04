@@ -1,16 +1,23 @@
 [GLOBAL]
-pants_version = "2.24.1"
+pants_version = "2.33.1"
 
 pythonpath = ["%(buildroot)s/pants-plugins/cargo-porcelain"]
+# The porcelain's own dependencies, for the backend loaded from source above, spelled as in
+# pants-plugins/cargo-porcelain/pyproject.toml.
+plugins = [
+  "pants_backend_cc @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e#subdirectory=pants-plugins/cc",
+  "pants_backend_platforms @ git+https://github.com/tgolsson/pants-backends@5060ff485a3e401980ef539b46d93575cedff568#subdirectory=pants-plugins/platforms",
+]
 
 backend_packages = [
-  "pants.backend.experimental.python",
+  "pants.backend.python",
   "pants.backend.experimental.python.lint.ruff.check",
   "pants.backend.plugin_development",
-  "pants.backend.python",
   "pants.backend.python.lint.black",
   "pants.backend.python.lint.flake8",
   "pants.backend.python.lint.isort",
+  # Pants 2.33 runs on CPython 3.14, which the plugin tests therefore need too.
+  "pants.backend.python.providers.experimental.python_build_standalone",
   "pants.backend.shell",
   "pants.backend.tools.taplo",
 
@@ -22,14 +29,12 @@ pants_ignore = [".*/", "/dist/", "__pycache__", "**/pdm_build.py"]
 
 [python]
 tailor_pex_binary_targets = true
-interpreter_constraints = ["==3.9.*"]
+interpreter_constraints = ["==3.14.*"]
 enable_resolves = true
 default_resolve = "pants-plugins"
 
 [python.resolves]
 pants-plugins = "pants-plugins/pants.lock"
-pants-current = "pants-plugins/current.lock"
-pants-next = "pants-plugins/next.lock"
 
 pytest = "locks/tools/pytest.lock"
 isort = "locks/tools/isort.lock"
@@ -37,11 +42,11 @@ ipython = "locks/tools/ipython.lock"
 black = "locks/tools/black.lock"
 
 [python.resolves_to_interpreter_constraints]
-pants-plugins = ["==3.9.*"]
-pants-current = ["==3.9.*"]
-pants-next = ["==3.9.*"]
-
+pants-plugins = ["==3.14.*"]
+pytest = ["==3.14.*"]
 black = [">=3.9,<3.10"]
+isort = [">=3.9,<3.10"]
+ipython = [">=3.9,<3.10"]
 
 [black]
 install_from_resolve = "black"
@@ -69,13 +74,7 @@ marker_filenames = ["pyproject.toml"]
 enabled = false
 
 [rustup]
-rust_version = "1.72.1"
+rust_version = "1.97.0"
 
 [clippy]
 args = ["--", "-Dwarnings"]
-
-[sccache]
-enabled = true
-
-[binstall]
-enable = true

@@ -1,25 +1,29 @@
+"""`pants fmt` with rustfmt: one `cargo fmt` per workspace (or loose package)."""
+
 from __future__ import annotations
 
+import glob
 from dataclasses import dataclass
 
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.fmt import FmtResult, FmtTargetsRequest
-from pants.core.util_rules.environments import EnvironmentField
 from pants.core.util_rules.partitions import Partition, PartitionerType, Partitions
-from pants.core.util_rules.source_files import SourceFiles, SourceFilesRequest
+from pants.core.util_rules.source_files import SourceFilesRequest, determine_source_files
 from pants.engine.addresses import Address
-from pants.engine.internals.selectors import Get, MultiGet
-from pants.engine.platform import Platform
-from pants.engine.process import ProcessResult
-from pants.engine.rules import collect_rules, rule
+from pants.engine.fs import CreateDigest, FileEntry, MergeDigests
+from pants.engine.intrinsics import create_digest, get_digest_entries, merge_digests
+from pants.engine.process import fallible_to_exec_result_or_raise
+from pants.engine.rules import collect_rules, concurrently, implicitly, rule
 from pants.engine.target import FieldSet
 from pants.util.logging import LogLevel
+from pants_backend_platforms.util_rules.platforms import KnownPlatforms
 
-from pants_cargo_porcelain.internal.platform import platform_to_target
-from pants_cargo_porcelain.subsystems import RustSubsystem, RustupTool
+from pants_cargo_porcelain.subsystems import RustSubsystem
 from pants_cargo_porcelain.target_types import CargoPackageNameField, CargoPackageSourcesField
-from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest
-from pants_cargo_porcelain.util_rules.rustup import RustToolchain, RustToolchainRequest
-from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest
+from pants_cargo_porcelain.util_rules.cargo import CargoProcessRequest, manifest_path
+from pants_cargo_porcelain.util_rules.rustup import install_rust_toolchain
+from pants_cargo_porcelain.util_rules.sandbox import CargoSourcesRequest, cargo_sources
+from pants_cargo_porcelain.util_rules.workspace import CargoPackageMapping
 
 
 @dataclass(frozen=True)
@@ -30,7 +34,6 @@ class CargoFmtFieldSet(FieldSet):
     environment: EnvironmentField
 
 
-@dataclass(frozen=True)
 class CargoFmtRequest(FmtTargetsRequest):
     field_set_type = CargoFmtFieldSet
     partitioner_type = PartitionerType.CUSTOM
@@ -38,72 +41,86 @@ class CargoFmtRequest(FmtTargetsRequest):
 
 
 @dataclass(frozen=True)
-class PackageMetadata:
-    address: Address
+class RootMetadata:
+    """A workspace (or a package outside any), the unit cargo fmt and clippy run on."""
+
+    root: Address
+    workspace: bool
 
     @property
-    def description(self) -> None:
-        return None
+    def description(self) -> str:
+        return str(self.root)
+
+
+def root_of(mapping: CargoPackageMapping, package: Address) -> RootMetadata:
+    workspace = mapping.workspace_for(package)
+    return RootMetadata(workspace or package, workspace is not None)
 
 
 @rule
-async def partition(
-    request: CargoFmtRequest.PartitionRequest[CargoFmtFieldSet], subsystem: RustSubsystem
-) -> Partitions[CargoFmtFieldSet, PackageMetadata]:
-    if subsystem.skip:
+async def partition_cargo_fmt(
+    request: CargoFmtRequest.PartitionRequest[CargoFmtFieldSet],
+    rust: RustSubsystem,
+    mapping: CargoPackageMapping,
+) -> Partitions[str, RootMetadata]:
+    if rust.skip:
         return Partitions()
+    all_sources = await concurrently(
+        determine_source_files(SourceFilesRequest([fs.sources])) for fs in request.field_sets
+    )
+    by_root: dict[RootMetadata, set[str]] = {}
+    for field_set, sources in zip(request.field_sets, all_sources):
+        files = by_root.setdefault(root_of(mapping, field_set.address), set())
+        files.update(f for f in sources.files if f.endswith(".rs"))
+    return Partitions(
+        Partition(tuple(sorted(files)), root) for root, files in by_root.items() if files
+    )
 
-    partitions = []
-    for field_set in request.field_sets:
-        source_files = await Get(
-            SourceFiles,
-            SourceFilesRequest([field_set.sources]),
-        )
 
-        partitions.append(
-            Partition(
-                frozenset([f for f in source_files.files if f.endswith("rs")]),
-                PackageMetadata(
-                    address=field_set.address,
+@rule(desc="Format with cargo fmt", level=LogLevel.DEBUG)
+async def cargo_fmt(
+    request: CargoFmtRequest.Batch[str, RootMetadata], known: KnownPlatforms
+) -> FmtResult:
+    root = request.partition_metadata
+    toolchain, sources = await concurrently(
+        install_rust_toolchain(**implicitly()),
+        cargo_sources(
+            CargoSourcesRequest(
+                frozenset([root.root]),
+                include_packages=False,
+                platform=known.host,
+                dependent=root.root,
+            )
+        ),
+    )
+    # The batch's files come from the fmt chain (an earlier formatter may have changed them);
+    # everything else cargo needs comes from the sources.
+    # A file name may hold glob characters (`src/[gen].rs`): the batch's files leave the
+    # sources by exact path, and their outputs are captured escaped.
+    batch = set(request.files)
+    entries = await get_digest_entries(sources.digest)
+    others = await create_digest(
+        CreateDigest(e for e in entries if not (isinstance(e, FileEntry) and e.path in batch))
+    )
+    input_digest = await merge_digests(MergeDigests([others, request.snapshot.digest]))
+    result = await fallible_to_exec_result_or_raise(
+        **implicitly(
+            CargoProcessRequest(
+                toolchain,
+                (
+                    "fmt",
+                    f"--manifest-path={manifest_path(root.root.spec_path)}",
+                    *(("--all",) if root.workspace else ()),
                 ),
+                description=f"cargo fmt {root.root}",
+                digest=input_digest,
+                output_files=tuple(glob.escape(f) for f in request.files),
+                env=sources.env,
             )
         )
-
-    return Partitions(partitions)
-
-
-@rule(desc="Format Cargo package", level=LogLevel.DEBUG)
-async def cargo_fmt(
-    request: CargoFmtRequest.Batch[CargoFmtFieldSet, PackageMetadata],
-    rustup: RustupTool,
-    platform: Platform,
-) -> FmtResult:
-    toolchain, source_files = await MultiGet(
-        Get(
-            RustToolchain,
-            RustToolchainRequest(
-                rustup.rust_version, platform_to_target(platform), ("cargo", "rustfmt")
-            ),
-        ),
-        Get(SourceFiles, CargoSourcesRequest(frozenset([request.partition_metadata.address]))),
     )
-
-    cargo_toml_path = f"{request.partition_metadata.address.spec_path}/Cargo.toml"
-    process_result = await Get(
-        ProcessResult,
-        CargoProcessRequest(
-            toolchain,
-            ("fmt", f"--manifest-path={cargo_toml_path}"),
-            source_files.snapshot.digest,
-            output_files=request.files,
-        ),
-    )
-
-    return await FmtResult.create(request, process_result)
+    return await FmtResult.create(request, result)
 
 
 def rules():
-    return [
-        *collect_rules(),
-        *CargoFmtRequest.rules(),
-    ]
+    return [*collect_rules(), *CargoFmtRequest.rules()]

@@ -1,75 +1,75 @@
 from __future__ import annotations
 
-from typing import Iterable, Optional, Tuple
-
+from pants.core.environments.target_types import EnvironmentField
 from pants.core.goals.package import OutputPathField
-from pants.core.util_rules.environments import EnvironmentField
-from pants.engine.addresses import Address
-from pants.engine.rules import collect_rules
 from pants.engine.target import (
     COMMON_TARGET_FIELDS,
     BoolField,
     Dependencies,
-    InvalidFieldException,
     MultipleSourcesField,
     StringField,
+    StringSequenceField,
     Target,
     TargetGenerator,
     generate_multiple_sources_field_help_message,
 )
 from pants.util.strutil import help_text
+from pants_backend_platforms.target_types import PlatformsField
+
+# ---------------------------------------------------------------------------
+# Workspace
+# ---------------------------------------------------------------------------
 
 
 class CargoWorkspaceSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "Cargo.lock")
+    default = ("Cargo.toml", "Cargo.lock", "rust-toolchain.toml", ".cargo/config.toml")
     expected_file_extensions = (".toml", ".lock")
     help = generate_multiple_sources_field_help_message(
-        "Example: `sources=['Cargo.toml', 'Cargo.lock']`"
+        "Example: `sources=['Cargo.toml', 'Cargo.lock', '.cargo/config.toml']`"
     )
 
 
 class CargoWorkspaceTarget(Target):
     alias = "cargo_workspace"
     core_fields = (*COMMON_TARGET_FIELDS, CargoWorkspaceSourcesField)
+    help = help_text("""
+        The root of a Cargo workspace: its `Cargo.toml`, `Cargo.lock` and the
+        `rust-toolchain.toml` and `.cargo/config.toml` cargo reads from there. The member
+        packages are found through the manifest's `members` and depend on it. Test
+        executables and clippy run once per workspace.
+        """)
 
 
-class CargoPackageNameField(StringField):
-    alias = "package_name"
-    help = "The name of the package."
-
-
-class _CargoPackageMarker(StringField):
-    alias = "_package_tag"
-    help = "Marker for a top level package"
-
-
-class _CargoSourcesMarker(StringField):
-    alias = "_sources_tag"
-    help = "Marker for a Rust source bundle with Cargo files"
+# ---------------------------------------------------------------------------
+# Package
+# ---------------------------------------------------------------------------
 
 
 class CargoPackageSourcesField(MultipleSourcesField):
-    default = ("Cargo.toml", "Cargo.lock", "build.rs", "src/**/*", "tests/**/*.rs", "examples/**/*")
+    default = (
+        "Cargo.toml",
+        "Cargo.lock",
+        "build.rs",
+        "src/**/*",
+        "tests/**/*.rs",
+        "examples/**/*",
+        "benches/**/*.rs",
+    )
     expected_file_extensions = (".rs", ".toml", ".lock")
     help = generate_multiple_sources_field_help_message(
         "Example: `sources=['Cargo.toml', 'src/lib.rs', 'build.rs', '!test_ignore.rs']`"
     )
 
-    @classmethod
-    def compute_value(
-        cls, raw_value: Optional[Iterable[str]], address: Address
-    ) -> Optional[Tuple[str, ...]]:
-        value_or_default = super().compute_value(raw_value, address)
-        if not value_or_default:
-            raise InvalidFieldException(
-                f"The {repr(cls.alias)} field in target {address} must be set to files/globs in "
-                f"the target's directory, but it was set to {repr(value_or_default)}."
-            )
-        return value_or_default
-
 
 class CargoPackageDependenciesField(Dependencies):
-    pass
+    help = help_text("""
+        Besides the inferred cargo dependencies: `files` and `resources` targets the build
+        reads (`include_str!`, build-script inputs), and packageable targets whose
+        `package` output the build needs. Those are built and staged in the sandbox at their
+        package path (for build, test, run and clippy; not for fmt and generate-lockfiles),
+        but their own dependencies are not; point cargo or a build script at them through
+        `env`.
+        """)
 
 
 class SkipCargoTestsField(BoolField):
@@ -78,134 +78,121 @@ class SkipCargoTestsField(BoolField):
     help = "If true, don't run this package's tests."
 
 
-class CargoPackageTarget(TargetGenerator):
-    alias = "cargo_package"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoPackageDependenciesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        CargoPackageSourcesField,
-        _CargoPackageMarker,
-    )
-    copied_fields = (
-        *COMMON_TARGET_FIELDS,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        _CargoPackageMarker,
-    )
-    moved_fields = (CargoPackageDependenciesField,)
+class CargoEnvField(StringSequenceField):
+    alias = "env"
     help = help_text("""
+        `KEY=VALUE` entries set in the environment of every cargo process (build, test,
+        clippy, fmt) whose sandbox holds this package: its own, those of packages depending on
+        it, and those of its workspace; and of the test executables and `run` binaries those
+        build. `{chroot}` expands to the sandbox root, so a staged dependency
+        can be named: `env=["MYLIB_DIR={chroot}/build"]`. `PATH`, `CARGO_HOME`,
+        `RUSTUP_HOME`, `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the C toolchain's
+        `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<triple>`, `CXX_<triple>` and `AR_<triple>` are
+        set by the backend and may not be set here.
         """)
 
 
-class CargoBinaryNameField(StringField):
-    alias = "binary_name"
-    help = "The name of the binary."
+class CargoPackageNameField(StringField):
+    alias = "package_name"
+    help = "The package's name from `Cargo.toml`."
 
 
-class CargoTestNameField(StringField):
-    alias = "test_name"
-    help = "The name of the test."
+class CargoArtifactKindField(StringField):
+    alias = "kind"
+    valid_choices = ("lib", "bin", "test")
+    help = "What cargo builds this target as: the library, a binary, or an integration test."
 
 
-class CargoLibraryNameField(StringField):
-    alias = "library_name"
-    help = "The name of the library."
+class CargoArtifactNameField(StringField):
+    alias = "artifact_name"
+    help = "The cargo target's name (`[[bin]] name`, `[[test]] name`, or the library's)."
+
+
+class _CargoPackageMarker(StringField):
+    alias = "_package_tag"
+    help = "Marker for the package target."
+
+
+_SHARED_FIELDS = (
+    *COMMON_TARGET_FIELDS,
+    SkipCargoTestsField,
+    OutputPathField,
+    EnvironmentField,
+    CargoEnvField,
+    PlatformsField,
+)
+
+
+class CargoPackageTarget(TargetGenerator):
+    alias = "cargo_package"
+    core_fields = (*_SHARED_FIELDS, CargoPackageDependenciesField, CargoPackageSourcesField)
+    copied_fields = _SHARED_FIELDS
+    moved_fields = (CargoPackageDependenciesField,)
+    help = help_text("""
+        A Cargo package. `cargo metadata` on its `Cargo.toml` generates one
+        `cargo_package_impl` holding the sources, a `cargo_library` if it has one, one
+        `cargo_binary` per `[[bin]]` and one `cargo_test` per `[[test]]`, all addressable as
+        `path:name#<generated name>`.
+        """)
 
 
 class CargoPackageTargetImpl(Target):
     alias = "cargo_package_impl"
     core_fields = (
-        *COMMON_TARGET_FIELDS,
+        *_SHARED_FIELDS,
         CargoPackageDependenciesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
+        CargoPackageSourcesField,
         CargoPackageNameField,
         _CargoPackageMarker,
     )
-    help = help_text("""
-
-        """)
+    help = "The generated package itself: its sources and cargo dependencies. Formatted and linted."
 
 
-class CargoSourcesTarget(Target):
-    alias = "cargo_sources"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoPackageDependenciesField,
-        CargoPackageSourcesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        CargoPackageNameField,
-        _CargoSourcesMarker,
-    )
-    help = help_text("""
-
-        """)
-
-
-class CargoBinaryTarget(Target):
-    alias = "cargo_binary"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoPackageDependenciesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        CargoBinaryNameField,
-    )
-    help = help_text("""
-
-        """)
-
-
-class CargoTestTarget(Target):
-    alias = "cargo_test"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoPackageDependenciesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        CargoTestNameField,
-        CargoPackageSourcesField,
-    )
-    help = help_text("""
-
-        """)
+_ARTIFACT_FIELDS = (
+    *_SHARED_FIELDS,
+    CargoPackageDependenciesField,
+    CargoPackageNameField,
+    CargoArtifactKindField,
+    CargoArtifactNameField,
+)
 
 
 class CargoLibraryTarget(Target):
     alias = "cargo_library"
-    core_fields = (
-        *COMMON_TARGET_FIELDS,
-        CargoPackageDependenciesField,
-        SkipCargoTestsField,
-        OutputPathField,
-        EnvironmentField,
-        CargoLibraryNameField,
+    core_fields = _ARTIFACT_FIELDS
+    help = "The package's library. `test` runs its unit tests."
+
+
+class CargoBinaryTarget(Target):
+    alias = "cargo_binary"
+    core_fields = _ARTIFACT_FIELDS
+    help = "One `[[bin]]` of the package. `package` and `run` build it; `test` runs its unit tests."
+
+
+class CargoTestTarget(Target):
+    alias = "cargo_test"
+    core_fields = _ARTIFACT_FIELDS
+    help = "One `[[test]]` of the package, run by `test`."
+
+
+# ---------------------------------------------------------------------------
+# Platform
+# ---------------------------------------------------------------------------
+
+
+class RustTargetField(StringField):
+    alias = "rust_target"
+    help = (
+        "The Rust target triple cargo builds this platform as. Unset, derived from `os` and `arch`."
     )
-    help = help_text("""
-
-        """)
-
-
-def rules():
-    return [
-        *collect_rules(),
-    ]
 
 
 def target_types():
     return [
+        CargoWorkspaceTarget,
         CargoPackageTarget,
         CargoPackageTargetImpl,
-        CargoBinaryTarget,
         CargoLibraryTarget,
-        CargoWorkspaceTarget,
+        CargoBinaryTarget,
+        CargoTestTarget,
     ]

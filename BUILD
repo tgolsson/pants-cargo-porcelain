@@ -1,8 +1,8 @@
 TOOLS = {
     "pytest": [
-        "pytest-cov!=2.12.1,<3.1,>=2.12",
-        "pytest-xdist<3,>=2.5",
-        "pytest==7.0.*",
+        "pytest>=8,<9",
+        "pytest-xdist>=3,<4",
+        "pytest-cov>=5",
     ],
     "black": ["black>=22.6.0,<24"],
     "ipython": ["ipython>=7.27.0,<8"],

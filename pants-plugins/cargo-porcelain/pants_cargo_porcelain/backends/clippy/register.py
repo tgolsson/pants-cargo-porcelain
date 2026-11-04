@@ -1,9 +1,6 @@
-from . import subsystem
-from .goals import lint
+from pants_cargo_porcelain.backends.clippy import subsystem
+from pants_cargo_porcelain.backends.clippy.goals import lint
 
 
 def rules():
-    return [
-        *lint.rules(),
-        *subsystem.rules(),
-    ]
+    return [*subsystem.rules(), *lint.rules()]
