@@ -31,7 +31,7 @@ stability guarantees until it nears feature completeness.
   and the per-workspace `test` build, `fmt` and `lint`), and for the test executables and
   `run` binaries those build; `{chroot}` is the sandbox root, so
   `env=["MYLIB_DIR={chroot}/build"]` points a build script at a staged library. `PATH`,
-  `CARGO`, `CARGO_HOME`, `CARGO_TARGET_DIR`, `CARGO_INCREMENTAL`, `RUSTUP_HOME`,
+  `CARGO`, `CARGO_HOME`, `CARGO_TARGET_DIR`, `CARGO_INCREMENTAL`, `RUSTUP_HOME`, `RUSTUP_TOOLCHAIN`,
   `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the toolchain's `CARGO_TARGET_<TRIPLE>_LINKER`,
   `CC_<triple>`, `CXX_<triple>` and `AR_<triple>` are the backend's and rejected. `skip_tests` as
   usual; `output_path` is the directory under `dist/` (default `path.to.target/`), the file

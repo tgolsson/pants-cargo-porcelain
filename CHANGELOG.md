@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sandbox; `env` sets variables for every cargo process holding the package.
 - Toolchain: `[rustup]` pins rustup-init and installs the toolchain of `[rustup].rust_version`
   or the `rust-toolchain.toml` channel into named caches, nothing from the host's `~/.rustup`
-  or `~/.cargo`; every cargo process gets a fresh `target/`, and `[kache]` caches compiled
+  or `~/.cargo`, and `RUSTUP_TOOLCHAIN` pins every cargo process to it, so subcommands run
+  through rustup's proxies (`cargo clippy`) do not fall back to the cache's default toolchain;
+  every cargo process gets a fresh `target/`, and `[kache]` caches compiled
   crates across sandboxes. `[sccache]` and `[binstall]` are gone.
 - Platforms through pants-backend-platforms: a `cargo_package`'s `platforms` builds its binaries
   for the enabled `platform` targets under `dist/<platform>/`, and the platform's `cc_toolchain`

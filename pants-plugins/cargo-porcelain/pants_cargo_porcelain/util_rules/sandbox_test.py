@@ -224,7 +224,14 @@ WINDOWS = TargetPlatform(OTHER, "windows", "x86_64")
 
 @pytest.mark.parametrize(
     "key",
-    ["PATH", "RUSTFLAGS", "KACHE_BASE_DIR", "__PANTS_CC_TOOLCHAIN", *toolchain_env_names(MACHINE)],
+    [
+        "PATH",
+        "RUSTFLAGS",
+        "RUSTUP_TOOLCHAIN",
+        "KACHE_BASE_DIR",
+        "__PANTS_CC_TOOLCHAIN",
+        *toolchain_env_names(MACHINE),
+    ],
 )
 def test_reserved_env_is_rejected(rule_runner: RuleRunner, key: str) -> None:
     files = package_fixture("hello")

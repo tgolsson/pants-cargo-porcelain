@@ -86,7 +86,7 @@ class CargoEnvField(StringSequenceField):
         it, and those of its workspace; and of the test executables and `run` binaries those
         build. `{chroot}` expands to the sandbox root, so a staged dependency
         can be named: `env=["MYLIB_DIR={chroot}/build"]`. `PATH`, `CARGO_HOME`,
-        `RUSTUP_HOME`, `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the C toolchain's
+        `RUSTUP_HOME`, `RUSTUP_TOOLCHAIN`, `RUSTC_WRAPPER`, `RUSTFLAGS`, `KACHE_*` and the C toolchain's
         `CARGO_TARGET_<TRIPLE>_LINKER`, `CC_<triple>`, `CXX_<triple>` and `AR_<triple>` are
         set by the backend and may not be set here.
         """)
